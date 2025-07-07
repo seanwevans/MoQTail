@@ -9,12 +9,18 @@ $ cargo build --manifest-path plugins/mosquitto/Cargo.toml --release
 ```
 
 The resulting `libmoqtail_mosquitto.so` can be loaded by Mosquitto.
+For example:
+
+```bash
+$ cargo build --manifest-path plugins/mosquitto/Cargo.toml --release
+$ sudo cp plugins/mosquitto/target/release/libmoqtail_mosquitto.so /usr/lib/
+```
 
 ## Example Configuration
 
 ```conf
 # mosquitto.conf
-plugin /path/to/libmoqtail_mosquitto.so
+plugin /usr/lib/libmoqtail_mosquitto.so
 plugin_opt_selector /foo/+
 plugin_opt_selector //sensor/#
 ```

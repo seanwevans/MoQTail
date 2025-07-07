@@ -8,7 +8,7 @@ description = "Placeholder crate for the Mosquitto plugin"
 
 [lib]
 path = "src/lib.rs"
-crate-type = ["cdylib"]
+crate-type = ["cdylib", "rlib"]
 
 [workspace]
 
@@ -17,3 +17,4 @@ moqtail-core = { path = "../../crates/moqtail-core" }
 
 [build-dependencies]
 cc = "1"
+bindgen = "0.69"
