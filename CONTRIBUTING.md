@@ -18,6 +18,14 @@ This guide explains the project layout, coding standards, and pull‑request wor
 | `docs/`                | mdBook user guide & DSL reference        | Markdown    |
 
 > **Tip:** Run `cargo xtask repo-graph` to visualise crate dependencies (requires `cargo‑hack`).
+>
+> The alias in `.cargo/config.toml` lets you run it from the repository root:
+>
+> ```bash
+> cargo xtask repo-graph
+> ```
+>
+> It prints one `crate -> dependency` line for every workspace crate using `cargo metadata`.
 
 ---
 
