@@ -9,3 +9,8 @@ description = "Placeholder crate for the EMQX plugin"
 [lib]
 path = "src/lib.rs"
 crate-type = ["cdylib"]
+
+[workspace]
+
+[dependencies]
+moqtail-core = { path = "../../crates/moqtail-core" }
