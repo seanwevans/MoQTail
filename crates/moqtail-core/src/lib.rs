@@ -35,3 +35,5 @@ mod tests {
 pub fn compile(query: &str) -> String {
     format!("compiled: {}", query)
 }
+
+}
