@@ -13,7 +13,7 @@ MoQTail is a free, open‑source extension layer that lets publishers and subscr
 | Topic filters have only two wildcards (`+`, `#`). Complex hierarchies become unwieldy. | `/building[wing="E" and floor>3]//sensor[@type='temp']` — expressive, readable selectors. |
 | Brokers can’t route on message metadata (retained flag, QoS, properties). | Predicate axes over headers & properties: `/msg[retained=true and qos<=1]`. |
 | Payload‑aware routing requires an external pipeline. | Dual‑phase selector lets the broker peek into JSON / CBOR / ProtoBuf payload fields. |
-| Edge analytics needs separate tooling (Node‑RED/NiFi). | Built‑in functional pipeline (`|> window(60s) |> avg(json$.value)`). |
+| Edge analytics needs separate tooling (Node‑RED/NiFi). | Built‑in functional pipeline |
 
 MoQTail keeps MQTT’s 2‑byte fixed header intact — **zero protocol bloat** — but adds a powerful, broker‑side query engine that low‑power clients can opt into with a single subscription string.
 
