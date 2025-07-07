@@ -9,3 +9,7 @@ moqtail-core = { path = "../moqtail-core" }
 [dependencies.clap]
 version = "4"
 features = ["derive"]
+
+[dev-dependencies]
+assert_cmd = "2"
+predicates = "2"
