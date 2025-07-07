@@ -70,10 +70,7 @@ you agree to uphold its guidelines.
 
 **MoQTail** is dual‑licensed under either
 
-* MIT License (see `LICENSE-MIT`), **or**
-* Apache License, Version 2.0 (see `LICENSE-APACHE`)
-
-at your option.
+* MIT License (see `LICENSE`)
 
 ---
 
