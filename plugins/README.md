@@ -27,3 +27,14 @@ workspace in the repository root (coming in later milestones).
 
 > **Note:** The plugins are currently placeholders pending the v0.2 milestone.
 > Expect breaking changes as the APIs stabilise.
+
+## Building the Mosquitto plugin
+
+Compile the shared library using Cargo:
+
+```bash
+$ cargo build -p moqtail-mosquitto --release
+```
+
+The resulting `libmoqtail_mosquitto.so` in `target/release/` can then be loaded
+by Mosquitto as a plugin.

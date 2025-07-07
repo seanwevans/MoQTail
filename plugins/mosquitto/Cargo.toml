@@ -9,3 +9,11 @@ description = "Placeholder crate for the Mosquitto plugin"
 [lib]
 path = "src/lib.rs"
 crate-type = ["cdylib"]
+
+[workspace]
+
+[dependencies]
+moqtail-core = { path = "../../crates/moqtail-core" }
+
+[build-dependencies]
+cc = "1"
