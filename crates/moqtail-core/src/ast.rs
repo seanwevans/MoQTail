@@ -61,7 +61,7 @@ impl fmt::Display for Selector {
             }
 
             match &step.segment {
-                Segment::Literal(s) => write!(f, "{}", s)?,
+                Segment::Literal(s) => write!(f, "{s}")?,
                 Segment::Plus => write!(f, "+")?,
                 Segment::Hash => write!(f, "#")?,
                 Segment::Message => write!(f, "msg")?,
