@@ -1,4 +1,4 @@
-use crate::ast::{Axis, Field, Operator, Segment, Selector, Step, Value, Predicate};
+use crate::ast::{Axis, Field, Operator, Predicate, Segment, Selector, Step, Value};
 use serde_json::Value as JsonValue;
 use std::collections::HashMap;
 
@@ -78,7 +78,9 @@ impl Matcher {
             }
             Segment::Hash => {
                 // Try zero or more segments
-                if Self::predicates_match(&step.predicates, msg) && Self::match_steps(rest, topic, msg) {
+                if Self::predicates_match(&step.predicates, msg)
+                    && Self::match_steps(rest, topic, msg)
+                {
                     return true;
                 }
                 for idx in 0..topic.len() {
@@ -169,7 +171,11 @@ mod tests {
     use std::collections::HashMap;
 
     fn make_msg(topic: &str) -> Message<'_> {
-        Message { topic, headers: HashMap::new(), payload: None }
+        Message {
+            topic,
+            headers: HashMap::new(),
+            payload: None,
+        }
     }
 
     #[test]
