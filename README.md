@@ -26,7 +26,7 @@ MoQTail keeps MQTT’s 2‑byte fixed header intact — **zero protocol bloat** 
 3. **Modular architecture** – Separate crates / packages:
 
    * `moqtail-core` – DSL parser, AST, matcher engine
-   * `moqtail-broker` – pluggable adapter layer for Mosquitto, EMQX, HiveMQ (others welcome!)
+   * **Broker plugins** – adapters for Mosquitto and EMQX under `plugins/`
    * `moqtail-cli` – *tail -f* style command‑line client
    * `moqtail-js` / `moqtail-py` – thin client helpers for web & Python apps
 4. **FOSS‑friendly** – Dual‑licensed under MIT / Apache 2.0 to play nicely with both hobby and commercial adopters.
