@@ -25,7 +25,7 @@ fn main() {
     match cli.command {
         Commands::Sub { query } => match compile(&query) {
             Ok(selector) => {
-                println!("{}", selector);
+                println!("{selector}");
                 if std::env::var("MOQTAIL_DRY_RUN").is_ok() {
                     return;
                 }
@@ -45,7 +45,7 @@ fn main() {
                 }
             }
             Err(e) => {
-                eprintln!("Failed to compile selector: {}", e);
+                eprintln!("Failed to compile selector: {e}");
                 std::process::exit(1);
             }
         },
