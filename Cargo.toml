@@ -1,5 +1,7 @@
 [workspace]
 members = [
     "xtask"
+    "crates/moqtail-core",
+    "crates/moqtail-cli",
 ]
 resolver = "2"

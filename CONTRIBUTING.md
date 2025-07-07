@@ -95,13 +95,21 @@ $ make check  # fmt + clippy + tests + docs links
 
 ## 6. Git Hooks (Optional but Recommended)
 
-Run `scripts/install-git-hooks.sh` to install pre‑commit hooks that auto‑fmt, lint, and run fast unit tests.
+Run the helper once after cloning:
+
+```bash
+$ ./scripts/install-git-hooks.sh
+```
+
+It symlinks (or copies if necessary) every file in `scripts/hooks/` to
+`.git/hooks/`. The default `pre-commit` hook runs `cargo fmt`, `cargo clippy`,
+and a small test suite so issues are caught before you push.
 
 ---
 
 ## 7. Community Etiquette
 
-We abide by the **Contributor Covenant** (see `CODE_OF_CONDUCT.md`). Be respectful and patient; we’re all volunteers.
+We abide by the **Contributor Covenant**. See our [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md). Be respectful and patient; we’re all volunteers.
 
 If you have questions, join the Matrix room `#moqtail:matrix.org`.
 
