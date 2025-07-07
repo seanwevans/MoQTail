@@ -93,7 +93,7 @@ Run `scripts/install-git-hooks.sh` to install pre‑commit hooks that auto‑fmt
 
 ## 7. Community Etiquette
 
-We abide by the **Contributor Covenant** (see `CODE_OF_CONDUCT.md`). Be respectful and patient; we’re all volunteers.
+We abide by the **Contributor Covenant**. See our [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md). Be respectful and patient; we’re all volunteers.
 
 If you have questions, join the Matrix room `#moqtail:matrix.org`.
 
