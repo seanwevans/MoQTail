@@ -61,6 +61,8 @@ See [`docs/ROADMAP.md`](docs/ROADMAP.md) for granular tasks.
 ## Contributing
 
 We welcome issues, pull requests, and design discussions!  Start with [`CONTRIBUTING.md`](CONTRIBUTING.md) and join the chat on Matrix `#moqtail:matrix.org`.
+This project adheres to the [Contributor Covenant](CODE_OF_CONDUCT.md). By participating,
+you agree to uphold its guidelines.
 
 ---
 
