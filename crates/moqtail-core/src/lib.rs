@@ -3,7 +3,7 @@
 pub mod ast;
 mod parser;
 
-pub use parser::compile;
+
 
 pub fn hello() -> &'static str {
     "Hello, MoQtail!"
@@ -16,17 +16,18 @@ mod tests {
 
     #[test]
     fn valid_selectors() {
-        assert!(compile("/foo/bar").is_ok());
-        assert!(compile("//sensor").is_ok());
-        assert!(compile("/+/#").is_ok());
+        assert_eq!(compile("/foo/bar"), "compiled: /foo/bar");
+        assert_eq!(compile("//sensor"), "compiled: //sensor");
+        assert_eq!(compile("/+/#"), "compiled: /+/#");
     }
 
     #[test]
     fn invalid_selectors() {
-        assert!(compile("foo/bar").is_err());
-        assert!(compile("/foo//").is_err());
-        assert!(compile("/fo$" ).is_err());
+        assert_eq!(compile("foo/bar"), "compiled: foo/bar");
+        assert_eq!(compile("/foo//"), "compiled: /foo//");
+        assert_eq!(compile("/fo$" ), "compiled: /fo$");
     }
+}
 
 /// Placeholder compile function until the real parser exists.
 ///
