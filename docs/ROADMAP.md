@@ -11,6 +11,14 @@ MoQTail’s development is organised into four milestone releases plus an initia
 | **v0.2 – Header + JSON Predicates**  | Oct 2025      | Message‑metadata predicates, JSON payload introspection, first broker plugin |                                                         |
 | **v0.3 – Transforms & Aggregations** | Jan 2026      | Pipeline operator (\`                                                        | >\`), windows, built‑in functions, multi‑broker support |
 | **v1.0 – Stable Spec**               | Apr 2026      | Grammar freeze, cross‑language libs, production hardening                    |                                                         |
+## Milestone Checklist
+
+- [x] Bootstrap (Phase 0)
+- [x] v0.1 – Topic Selectors
+- [x] v0.2 – Header + JSON Predicates
+- [ ] v0.3 – Transforms & Aggregations
+- [ ] v1.0 – Stable Spec
+
 
 ---
 
