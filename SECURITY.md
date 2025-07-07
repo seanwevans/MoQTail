@@ -24,7 +24,7 @@ Once MoQTail reaches **v1.0**, we will maintain at least the two latest minor ve
    * Steps to reproduce (PoC).
    * Impact assessment (confidentiality, integrity, availability).
    * Proposed patch or mitigation if available.
-2. Encrypt reports with our PGP key *(fingerprint TBD; will be published here and on keys.openpgp.org).*  Unencrypted reports are accepted but discouraged.
+2. Encrypt reports with our PGP key *(fingerprint available on our website).*  Unencrypted reports are accepted but discouraged.
 3. We will acknowledge receipt **within three (3) business days** and provide a tracking ID.
 
 > **Please do *not* open public GitHub issues or discuss potential vulnerabilities in public fora until we coordinate disclosure.**
@@ -76,7 +76,6 @@ Out‑of‑scope for now: vulnerabilities in **downstream brokers**, user‑land
 
 * Security team: `security@moqtail.dev`
 * Public chat (non‑vuln questions): Matrix `#moqtail:matrix.org`
-* Project lead (PGP): *TBD*
 
 ---
 
