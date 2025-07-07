@@ -3,5 +3,7 @@ members = [
     "xtask",
     "crates/moqtail-core",
     "crates/moqtail-cli",
+    "bindings/python",
+    "bindings/js",
 ]
 resolver = "2"

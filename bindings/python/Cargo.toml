@@ -1,0 +1,12 @@
+[package]
+name = "moqtail-python"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "moqtail_py"
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3 = { version = "0.21", features = ["extension-module"] }
+moqtail-core = { path = "../../crates/moqtail-core" }
