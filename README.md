@@ -43,14 +43,23 @@ $ cargo install moqtail-cli
 $ moqtail sub "//sensor[@type='temp'][json$.value > 30]"
 ```
 
+```bash
+# Filter using header predicates
+$ moqtail sub "/msg[qos<=1][retained=true]//sensor"
+
+# Match JSON field status
+$ moqtail sub "//device[json$.status='online']"
+```
+
+
 > **Note:** The DSL and tooling are still in early design. Expect syntax tweaks!
 
 ---
 
 ## Roadmap
 
-* [ ] **v0.1**: Minimal XPath‑style selector → topic matcher (no payload introspection).
-* [ ] **v0.2**: Header / property predicates, JSON payload introspection.
+* [x] **v0.1**: Minimal XPath‑style selector → topic matcher (no payload introspection).
+* [x] **v0.2**: Header / property predicates, JSON payload introspection.
 * [ ] **v0.3**: Transform pipeline (`|>`), aggregation windows, broker plugin for Mosquitto.
 * [ ] **v1.0**: Stable grammar spec, full conformance test‑suite, production hardening.
 
