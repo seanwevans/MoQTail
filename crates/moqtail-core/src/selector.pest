@@ -1,6 +1,6 @@
 WHITESPACE = _{ " " | "\t" }
 
-selector = { SOI ~ path_segment+ ~ EOI }
+selector = { SOI ~ path_segment+ ~ stage* ~ EOI }
 
 path_segment = { slash ~ segment ~ predicate* }
 
@@ -25,3 +25,9 @@ number = { ASCII_DIGIT+ }
 boolean = { "true" | "false" }
 
 value = { boolean | number }
+
+stage = { pipe ~ function }
+pipe = _{ "|>" }
+function = { ident ~ "(" ~ func_arg? ~ ")" }
+func_arg = _{ duration | field }
+duration = { number ~ "s" }
