@@ -1,4 +1,4 @@
-use crate::ast::{Axis, Field, Operator, Predicate, Segment, Selector, Step, Value};
+use crate::ast::{Axis, Field, Operator, Predicate, Segment, Selector, Stage, Step, Value};
 use serde_json::Value as JsonValue;
 use std::collections::HashMap;
 
@@ -10,11 +10,25 @@ pub struct Message<'a> {
 
 pub struct Matcher {
     selector: Selector,
+    window: Vec<f64>,
+    window_size: usize,
 }
 
 impl Matcher {
     pub fn new(selector: Selector) -> Self {
-        Self { selector }
+        let window_size = selector
+            .stages
+            .iter()
+            .find_map(|s| match s {
+                Stage::Window(n) => Some(*n as usize),
+                _ => None,
+            })
+            .unwrap_or(1);
+        Self {
+            selector,
+            window: Vec::new(),
+            window_size,
+        }
     }
 
     pub fn matches(&self, msg: &Message) -> bool {
@@ -23,7 +37,35 @@ impl Matcher {
         } else {
             msg.topic.split('/').collect()
         };
-        Self::match_steps(&self.selector.0, &segments, msg)
+        Self::match_steps(&self.selector.steps, &segments, msg)
+    }
+
+    pub fn process(&mut self, msg: &Message) -> Option<f64> {
+        if !self.matches(msg) {
+            return None;
+        }
+        let mut result = None;
+        for stage in self.selector.stages.clone() {
+            match stage {
+                Stage::Window(_) => {}
+                Stage::Sum(field) => {
+                    let v = Self::extract_field(&field, msg)?;
+                    self.push_value(v);
+                    result = Some(self.window.iter().sum());
+                }
+                Stage::Avg(field) => {
+                    let v = Self::extract_field(&field, msg)?;
+                    self.push_value(v);
+                    let sum: f64 = self.window.iter().sum();
+                    result = Some(sum / self.window.len() as f64);
+                }
+                Stage::Count => {
+                    self.push_value(0.0);
+                    result = Some(self.window.len() as f64);
+                }
+            }
+        }
+        result
     }
 
     fn match_steps(steps: &[Step], topic: &[&str], msg: &Message) -> bool {
@@ -160,6 +202,32 @@ impl Matcher {
                 _ => false,
             },
             _ => false,
+        }
+    }
+
+    fn extract_field(field: &Field, msg: &Message) -> Option<f64> {
+        match field {
+            Field::Header(name) => msg.headers.get(name)?.parse::<f64>().ok(),
+            Field::Json(path) => {
+                let mut cur = msg.payload.as_ref()?;
+                for p in path {
+                    cur = cur.get(p)?;
+                }
+                if let Some(v) = cur.as_f64() {
+                    Some(v)
+                } else if let Some(i) = cur.as_i64() {
+                    Some(i as f64)
+                } else {
+                    None
+                }
+            }
+        }
+    }
+
+    fn push_value(&mut self, v: f64) {
+        self.window.push(v);
+        if self.window.len() > self.window_size {
+            self.window.remove(0);
         }
     }
 }

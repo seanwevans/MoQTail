@@ -12,7 +12,7 @@ pub enum Segment {
     Message,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Field {
     Header(String),
     Json(Vec<String>),
@@ -47,14 +47,25 @@ pub struct Step {
     pub predicates: Vec<Predicate>,
 }
 
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum Stage {
+    Window(u64),
+    Sum(Field),
+    Avg(Field),
+    Count,
+}
+
 #[derive(Debug, PartialEq, Eq)]
-pub struct Selector(pub Vec<Step>);
+pub struct Selector {
+    pub steps: Vec<Step>,
+    pub stages: Vec<Stage>,
+}
 
 use std::fmt;
 
 impl fmt::Display for Selector {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        for step in &self.0 {
+        for step in &self.steps {
             match step.axis {
                 Axis::Child => write!(f, "/")?,
                 Axis::Descendant => write!(f, "//")?,
@@ -67,6 +78,24 @@ impl fmt::Display for Selector {
                 Segment::Message => write!(f, "msg")?,
             }
         }
+        for stage in &self.stages {
+            match stage {
+                Stage::Window(s) => write!(f, " |> window({}s)", s)?,
+                Stage::Sum(field) => write!(f, " |> sum({})", display_field(field))?,
+                Stage::Avg(field) => write!(f, " |> avg({})", display_field(field))?,
+                Stage::Count => write!(f, " |> count()")?,
+            }
+        }
         Ok(())
+    }
+}
+
+fn display_field(fld: &Field) -> String {
+    match fld {
+        Field::Header(s) => s.clone(),
+        Field::Json(parts) => format!(
+            "json${}",
+            parts.iter().map(|p| format!(".{p}")).collect::<String>()
+        ),
     }
 }
