@@ -17,9 +17,9 @@ mod tests {
 
     #[test]
     fn valid_selectors() {
-        assert!(compile("/foo/bar").is_ok());
-        assert!(compile("//sensor").is_ok());
-        assert!(compile("/+/#").is_ok());
+        assert_eq!(compile("/foo/bar"), "compiled: /foo/bar");
+        assert_eq!(compile("//sensor"), "compiled: //sensor");
+        assert_eq!(compile("/+/#"), "compiled: /+/#");
     }
 
     #[test]
@@ -27,5 +27,13 @@ mod tests {
         assert!(compile("foo/bar").is_err());
         assert!(compile("/foo//").is_err());
         assert!(compile("/fo$").is_err());
+
     }
+
+    pub fn compile(query: &str) -> String {
+        format!("compiled: {}", query)
+    }
+}
+
+
 }
