@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 moqtail-core = { path = "../moqtail-core" }
+rumqttc = "0.24"
 
 [dependencies.clap]
 version = "4"
