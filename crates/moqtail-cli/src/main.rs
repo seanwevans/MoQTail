@@ -23,15 +23,6 @@ fn main() {
     let cli = Cli::parse();
 
     match cli.command {
-
-        Commands::Sub { query } => match compile(&query) {
-            Ok(sel) => println!("{:?}", sel),
-            Err(e) => {
-                eprintln!("{}", e);
-                std::process::exit(1);
-            }
-        },
-
         Commands::Sub { query } => {
             match compile(&query) {
                 Ok(selector) => {
@@ -50,7 +41,7 @@ fn main() {
                         .unwrap();
 
                     for notification in connection.iter() {
-                        if let Event::Incoming(Incoming::Publish(p)) = notification {
+                        if let Ok(Event::Incoming(Incoming::Publish(p))) = notification {
                             println!(
                                 "{}: {}",
                                 p.topic,
