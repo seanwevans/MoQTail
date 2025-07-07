@@ -2,12 +2,16 @@ WHITESPACE = _{ " " | "\t" }
 
 selector = { SOI ~ path_segment+ ~ EOI }
 
-path_segment = { slash ~ segment }
+path_segment = { slash ~ segment ~ predicate* }
 
 slash = { "//" | "/" }
 
 segment = { wildcard | ident }
 
+predicate = { "[" ~ ident ~ "=" ~ number ~ "]" }
+
 wildcard = { "+" | "#" }
 
 ident = { (ASCII_ALPHANUMERIC | "_" | "-")+ }
+
+number = { ASCII_DIGIT+ }
