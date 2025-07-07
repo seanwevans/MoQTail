@@ -36,3 +36,5 @@ mod tests {
         format!("compiled: {}", query)
     }
 }
+
+}
