@@ -80,7 +80,7 @@ impl fmt::Display for Selector {
         }
         for stage in &self.stages {
             match stage {
-                Stage::Window(s) => write!(f, " |> window({}s)", s)?,
+                Stage::Window(s) => write!(f, " |> window({s}s)")?,
                 Stage::Sum(field) => write!(f, " |> sum({})", display_field(field))?,
                 Stage::Avg(field) => write!(f, " |> avg({})", display_field(field))?,
                 Stage::Count => write!(f, " |> count()")?,
