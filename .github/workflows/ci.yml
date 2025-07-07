@@ -1,8 +1,9 @@
+---
 name: CI
 
-on:
+'on':
   push:
-    branches: [ main, work ]
+    branches: [main, work]
   pull_request:
 
 jobs:
@@ -36,3 +37,18 @@ jobs:
 
       - name: Run tests
         run: cargo test --all
+
+      - name: Install cargo-llvm-cov
+        if: runner.os == 'Linux'
+        run: cargo install cargo-llvm-cov --locked
+
+      - name: Generate coverage
+        if: runner.os == 'Linux'
+        run: cargo llvm-cov --workspace --lcov --output-path lcov.info
+
+      - name: Upload coverage artifact
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v3
+        with:
+          name: coverage
+          path: lcov.info
