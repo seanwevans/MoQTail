@@ -1,0 +1,13 @@
+WHITESPACE = _{ " " | "\t" }
+
+selector = { SOI ~ path_segment+ ~ EOI }
+
+path_segment = { slash ~ segment }
+
+slash = { "//" | "/" }
+
+segment = { wildcard | ident }
+
+wildcard = { "+" | "#" }
+
+ident = { (ASCII_ALPHANUMERIC | "_" | "-")+ }

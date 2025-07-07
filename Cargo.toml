@@ -1,6 +1,6 @@
 [workspace]
 members = [
-    "xtask"
+    "xtask",
     "crates/moqtail-core",
     "crates/moqtail-cli",
 ]
