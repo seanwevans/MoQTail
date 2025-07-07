@@ -68,3 +68,78 @@ fn filter_integration() {
         assert!(REGISTERED.is_none());
     }
 }
+
+#[test]
+fn header_filter() {
+    unsafe {
+        let key = CString::new("selector").unwrap();
+        let val = CString::new("/msg[qos<=1]").unwrap();
+        let mut opt = mosquitto_opt { key: key.as_ptr() as *mut c_char, value: val.as_ptr() as *mut c_char };
+        let mut userdata: *mut c_void = std::ptr::null_mut();
+
+        assert_eq!(mosquitto_plugin_init(std::ptr::null_mut(), &mut userdata, &mut opt, 1), 0);
+        let (cb, ctx) = REGISTERED.expect("callback registered");
+
+        let topic = CString::new("").unwrap();
+        let mut msg = mosquitto_evt_message {
+            future: std::ptr::null_mut(),
+            client: std::ptr::null_mut(),
+            topic: topic.as_ptr() as *mut c_char,
+            payload: std::ptr::null_mut(),
+            properties: std::ptr::null_mut(),
+            reason_string: std::ptr::null_mut(),
+            payloadlen: 0,
+            qos: 0,
+            reason_code: 0,
+            retain: false,
+            future2: [std::ptr::null_mut(); 4],
+        };
+
+        assert_eq!(cb(7, &mut msg as *mut _ as *mut c_void, ctx), 0);
+
+        msg.qos = 2;
+        assert_eq!(cb(7, &mut msg as *mut _ as *mut c_void, ctx), 1);
+
+        mosquitto_plugin_cleanup(std::ptr::null_mut(), userdata, std::ptr::null_mut(), 0);
+        assert!(REGISTERED.is_none());
+    }
+}
+
+#[test]
+fn payload_filter() {
+    unsafe {
+        let key = CString::new("selector").unwrap();
+        let val = CString::new("/foo[json$.temp>30]").unwrap();
+        let mut opt = mosquitto_opt { key: key.as_ptr() as *mut c_char, value: val.as_ptr() as *mut c_char };
+        let mut userdata: *mut c_void = std::ptr::null_mut();
+
+        assert_eq!(mosquitto_plugin_init(std::ptr::null_mut(), &mut userdata, &mut opt, 1), 0);
+        let (cb, ctx) = REGISTERED.expect("callback registered");
+
+        let topic = CString::new("foo").unwrap();
+        let payload1 = CString::new("{\"temp\":35}").unwrap();
+        let mut msg = mosquitto_evt_message {
+            future: std::ptr::null_mut(),
+            client: std::ptr::null_mut(),
+            topic: topic.as_ptr() as *mut c_char,
+            payload: payload1.as_ptr() as *mut c_void,
+            properties: std::ptr::null_mut(),
+            reason_string: std::ptr::null_mut(),
+            payloadlen: payload1.as_bytes().len() as u32,
+            qos: 0,
+            reason_code: 0,
+            retain: false,
+            future2: [std::ptr::null_mut(); 4],
+        };
+
+        assert_eq!(cb(7, &mut msg as *mut _ as *mut c_void, ctx), 0);
+
+        let payload2 = CString::new("{\"temp\":25}").unwrap();
+        msg.payload = payload2.as_ptr() as *mut c_void;
+        msg.payloadlen = payload2.as_bytes().len() as u32;
+        assert_eq!(cb(7, &mut msg as *mut _ as *mut c_void, ctx), 1);
+
+        mosquitto_plugin_cleanup(std::ptr::null_mut(), userdata, std::ptr::null_mut(), 0);
+        assert!(REGISTERED.is_none());
+    }
+}
