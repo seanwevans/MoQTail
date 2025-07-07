@@ -12,9 +12,15 @@ pub enum Segment {
 }
 
 #[derive(Debug, PartialEq, Eq)]
+pub enum Predicate {
+    Equals { name: String, value: String },
+}
+
+#[derive(Debug, PartialEq, Eq)]
 pub struct Step {
     pub axis: Axis,
     pub segment: Segment,
+    pub predicates: Vec<Predicate>,
 }
 
 #[derive(Debug, PartialEq, Eq)]
