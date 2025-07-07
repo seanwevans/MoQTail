@@ -2,17 +2,15 @@
 
 > **Status:** Living document – milestones evolve with community input
 
-MoQTail’s development is organised into iterative milestones.  Each milestone focuses on a cohesive feature set rather than a specific calendar date.  Work proceeds when previous stages reach maturity and contributor bandwidth allows.
+MoQTail’s development is organised into iterative milestones.  Each milestone focuses on a cohesive feature set rather than a specific calendar date.  Work proceeds when previous stages reach maturity and contributor bandwidth allows.  See [`docs/ROADMAP.md`](docs/ROADMAP.md) for the latest timeline.
 
 | Milestone                               | Core theme                                                                   |                                                         |
 | --------------------------------------- | ---------------------------------------------------------------------------- | ------------------------------------------------------- |
 | **Bootstrap (Phase 0)**                 | Namespace, governance, CI, core crates scaffolding                           |                                                         |
 | **v0.1 – Topic Selectors**              | Minimal DSL → topic-only matching & CLI demo                                 |                                                         |
 | **v0.2 – Header + JSON Predicates**     | Message‑metadata predicates, JSON payload introspection, first broker plugin |                                                         |
-| **v0.3 – Transforms & Aggregations**    | Pipeline operator (\`                                                        | >\`), windows, built‑in functions, multi‑broker support |
-| **v0.4 – Schema‑Aware Binary Payloads** | CBOR, ProtoBuf introspection, schema registry hooks                          |                                                         |
-| **v0.5 – Security & Policy Engine**     | RBAC/ABAC selector policies, per‑subscription resource quotas, audit trail   |                                                         |
-| **v1.0 – Stable Spec**                  | Grammar freeze, cross‑language libs, production hardening                    |                                                         |
+| **v0.3 – Transforms & Aggregations**    | Pipeline operator (`|>`), windows, built‑in functions, multi‑broker support |
+| **v1.0 – Stable Spec**                  | Grammar freeze, cross‑language libs, production hardening |
 
 ---
 
@@ -114,43 +112,6 @@ MoQTail’s development is organised into iterative milestones.  Each milestone 
 
 ---
 
-## v0.4 — Schema‑Aware Binary Payloads
-
-### Major Features
-
-1. **CBOR & ProtoBuf Axes**
-
-   * Grammar support for `cbor$` and `pb$` payload selectors.
-2. **Schema Registry Hooks**
-
-   * Auto‑discover `.proto` / CDDL schemas via topic metadata or registry lookup.
-3. **Computed Field Caching**
-
-   * Broker caches decoded binary field pointers for hot topics.
-4. **Integration Tests**
-
-   * Interop matrix with typical IoT devices sending CBOR or ProtoBuf.
-
----
-
-## v0.5 — Security & Policy Engine
-
-### Major Features
-
-1. **RBAC / ABAC Enforcement**
-
-   * Assign role tags to clients; selectors are checked against policy rules.
-2. **Quota & Rate Limits**
-
-   * Per‑subscription message/byte budgets; configurable eviction strategies.
-3. **Audit Trail**
-
-   * Structured logs of selector usage and match statistics.
-4. **Policy DSL**
-
-   * Simple YAML/JSON rule files for declarative security configuration.
-
----
 
 ## v1.0 — Stable Spec & Cross‑Language Release
 
