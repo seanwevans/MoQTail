@@ -1,7 +1,7 @@
 use pest::Parser;
 use pest_derive::Parser;
 
-use crate::ast::{Axis, Predicate, Segment, Selector, Step};
+use crate::ast::{Axis, Field, Operator, Predicate, Segment, Selector, Step, Value};
 
 #[derive(Parser)]
 #[grammar = "selector.pest"]
@@ -33,7 +33,14 @@ pub fn compile(input: &str) -> Result<Selector, String> {
                 "#" => Segment::Hash,
                 _ => unreachable!(),
             },
-            Rule::ident => Segment::Literal(segment_inner.as_str().to_string()),
+            Rule::ident => {
+                let s = segment_inner.as_str();
+                if s == "msg" {
+                    Segment::Message
+                } else {
+                    Segment::Literal(s.to_string())
+                }
+            }
             _ => unreachable!(),
         };
 
@@ -43,9 +50,42 @@ pub fn compile(input: &str) -> Result<Selector, String> {
                 continue;
             }
             let mut pred_inner = pred_pair.into_inner();
-            let name = pred_inner.next().unwrap().as_str().to_string();
-            let value = pred_inner.next().unwrap().as_str().to_string();
-            predicates.push(Predicate::Equals { name, value });
+            let field_pair = pred_inner.next().unwrap();
+            let inner_field = field_pair.into_inner().next().unwrap();
+            let field = match inner_field.as_rule() {
+                Rule::ident => Field::Header(inner_field.as_str().to_string()),
+                Rule::json_field => {
+                    let text = inner_field.as_str();
+                    let without = text.trim_start_matches("json$");
+                    let parts: Vec<String> = without
+                        .split('.')
+                        .filter(|p| !p.is_empty())
+                        .map(|p| p.to_string())
+                        .collect();
+                    Field::Json(parts)
+                }
+                _ => unreachable!(),
+            };
+
+            let op_pair = pred_inner.next().unwrap();
+            let op = match op_pair.as_str() {
+                "=" => Operator::Eq,
+                "<" => Operator::Lt,
+                ">" => Operator::Gt,
+                "<=" => Operator::Le,
+                ">=" => Operator::Ge,
+                _ => unreachable!(),
+            };
+
+            let value_pair = pred_inner.next().unwrap();
+            let value_inner = value_pair.into_inner().next().unwrap();
+            let value = match value_inner.as_rule() {
+                Rule::number => Value::Number(value_inner.as_str().parse().unwrap()),
+                Rule::boolean => Value::Bool(value_inner.as_str() == "true"),
+                _ => unreachable!(),
+            };
+
+            predicates.push(Predicate { field, op, value });
         }
 
         steps.push(Step {
