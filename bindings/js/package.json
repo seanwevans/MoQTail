@@ -1,0 +1,9 @@
+{
+  "name": "moqtail-js",
+  "version": "0.1.0",
+  "main": "index.js",
+  "files": ["index.js", "moqtail-js.node"],
+  "scripts": {
+    "install": "napi build --release"
+  }
+}
