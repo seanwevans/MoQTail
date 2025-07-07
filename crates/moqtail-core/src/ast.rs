@@ -9,11 +9,35 @@ pub enum Segment {
     Literal(String),
     Plus,
     Hash,
+    Message,
 }
 
 #[derive(Debug, PartialEq, Eq)]
-pub enum Predicate {
-    Equals { name: String, value: String },
+pub enum Field {
+    Header(String),
+    Json(Vec<String>),
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum Operator {
+    Eq,
+    Lt,
+    Gt,
+    Le,
+    Ge,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum Value {
+    Number(i64),
+    Bool(bool),
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub struct Predicate {
+    pub field: Field,
+    pub op: Operator,
+    pub value: Value,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -40,6 +64,7 @@ impl fmt::Display for Selector {
                 Segment::Literal(s) => write!(f, "{}", s)?,
                 Segment::Plus => write!(f, "+")?,
                 Segment::Hash => write!(f, "#")?,
+                Segment::Message => write!(f, "msg")?,
             }
         }
         Ok(())

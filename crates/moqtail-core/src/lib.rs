@@ -4,7 +4,7 @@ pub mod ast;
 mod matcher;
 mod parser;
 
-pub use matcher::Matcher;
+pub use matcher::{Matcher, Message};
 pub use parser::compile;
 
 pub fn hello() -> &'static str {

@@ -8,10 +8,20 @@ slash = { "//" | "/" }
 
 segment = { wildcard | ident }
 
-predicate = { "[" ~ ident ~ "=" ~ number ~ "]" }
+predicate = { "[" ~ field ~ operator ~ value ~ "]" }
+
+field = { json_field | ident }
+
+json_field = { "json$" ~ ("." ~ ident)+ }
+
+operator = { "<=" | ">=" | "<" | ">" | "=" }
 
 wildcard = { "+" | "#" }
 
 ident = { (ASCII_ALPHANUMERIC | "_" | "-")+ }
 
 number = { ASCII_DIGIT+ }
+
+boolean = { "true" | "false" }
+
+value = { boolean | number }
