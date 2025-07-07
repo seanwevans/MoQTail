@@ -215,10 +215,8 @@ impl Matcher {
                 }
                 if let Some(v) = cur.as_f64() {
                     Some(v)
-                } else if let Some(i) = cur.as_i64() {
-                    Some(i as f64)
                 } else {
-                    None
+                    cur.as_i64().map(|i| i as f64)
                 }
             }
         }
