@@ -5,105 +5,26 @@
 //! callback.  Incoming messages are filtered before they reach the broker
 //! clients.
 
-use moqtail_core::{ast::{Axis, Segment, Selector, Step}, compile};
+use moqtail_core::{compile, Matcher};
 use std::{ffi::CStr, os::raw::{c_char, c_int, c_void}};
+
+// Bindings generated in build.rs
+include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 
 const MOSQ_EVT_MESSAGE: c_int = 7;
 const MOSQ_ERR_SUCCESS: c_int = 0;
 
-#[repr(C)]
-pub struct MosquittoEvtMessage {
-    _future: *mut c_void,
-    _client: *mut c_void,
-    topic: *mut c_char,
-    _payload: *mut c_void,
-    _properties: *mut c_void,
-    _reason_string: *mut c_char,
-    _payloadlen: u32,
-    _qos: u8,
-    _reason_code: u8,
-    _retain: bool,
-}
+// Use generated types `mosquitto_evt_message` and `mosquitto_opt`
 
-extern "C" {
-    #[cfg_attr(not(test), link_name = "mosquitto_callback_register")]
-    fn mosquitto_callback_register(
-        identifier: *mut c_void,
-        event: c_int,
-        cb_func: Option<extern "C" fn(c_int, *mut c_void, *mut c_void) -> c_int>,
-        event_data: *const c_void,
-        userdata: *mut c_void,
-    ) -> c_int;
-
-    #[cfg_attr(not(test), link_name = "mosquitto_callback_unregister")]
-    fn mosquitto_callback_unregister(
-        identifier: *mut c_void,
-        event: c_int,
-        cb_func: Option<extern "C" fn(c_int, *mut c_void, *mut c_void) -> c_int>,
-        event_data: *const c_void,
-    ) -> c_int;
-}
 
 pub struct PluginContext {
-    selectors: Vec<Selector>,
-}
-
-fn match_segment(seg: &Segment, value: &str) -> bool {
-    match seg {
-        Segment::Literal(lit) => lit == value,
-        Segment::Plus => true,
-        Segment::Hash => true,
-    }
-}
-
-fn match_steps(steps: &[Step], segments: &[&str]) -> bool {
-    if steps.is_empty() {
-        return segments.is_empty();
-    }
-
-    let step = &steps[0];
-
-    if matches!(step.segment, Segment::Hash) {
-        return true;
-    }
-
-    match step.axis {
-        Axis::Child => {
-            if segments.is_empty() {
-                return false;
-            }
-            if match_segment(&step.segment, segments[0]) {
-                match_steps(&steps[1..], &segments[1..])
-            } else {
-                false
-            }
-        }
-        Axis::Descendant => {
-            for i in 0..segments.len() {
-                if match_segment(&step.segment, segments[i])
-                    && match_steps(&steps[1..], &segments[i + 1..])
-                {
-                    return true;
-                }
-            }
-            false
-        }
-    }
-}
-
-fn matches_selector(sel: &Selector, topic: &str) -> bool {
-    let parts: Vec<&str> = if topic.is_empty() {
-        Vec::new()
-    } else {
-        topic.split('/').collect()
-    };
-    match_steps(&sel.0, &parts)
+    matchers: Vec<Matcher>,
 }
 
 extern "C" fn on_message(_: c_int, event_data: *mut c_void, userdata: *mut c_void) -> c_int {
     unsafe {
         let ctx = &*(userdata as *mut PluginContext);
-        let msg = &*(event_data as *mut MosquittoEvtMessage);
+        let msg = &*(event_data as *mut mosquitto_evt_message);
         if msg.topic.is_null() {
             return MOSQ_ERR_SUCCESS;
         }
@@ -111,8 +32,8 @@ extern "C" fn on_message(_: c_int, event_data: *mut c_void, userdata: *mut c_voi
             Ok(t) => t,
             Err(_) => return 1,
         };
-        for sel in &ctx.selectors {
-            if matches_selector(sel, topic) {
+        for matcher in &ctx.matchers {
+            if matcher.matches(topic) {
                 return MOSQ_ERR_SUCCESS;
             }
         }
@@ -120,43 +41,39 @@ extern "C" fn on_message(_: c_int, event_data: *mut c_void, userdata: *mut c_voi
     1
 }
 
-#[repr(C)]
-pub struct MosquittoOpt {
-    pub key: *const c_char,
-    pub value: *const c_char,
-}
+// Generated bindings provide `mosquitto_opt`
 
 /// Called when the plugin is loaded.
 #[no_mangle]
 pub unsafe extern "C" fn mosquitto_plugin_init(
     identifier: *mut c_void,
     userdata: *mut *mut c_void,
-    options: *mut MosquittoOpt,
+    options: *mut mosquitto_opt,
     option_count: c_int,
 ) -> c_int {
     let slice = std::slice::from_raw_parts(options, option_count as usize);
-    let mut selectors = Vec::new();
+    let mut matchers = Vec::new();
 
     for opt in slice.iter() {
         if opt.key.is_null() || opt.value.is_null() {
             continue;
         }
         let key = CStr::from_ptr(opt.key).to_string_lossy();
-        if key == "selector" {
+        if key == "selector" || key == "plugin_opt_selector" {
             let val = CStr::from_ptr(opt.value).to_string_lossy();
             match compile(&val) {
-                Ok(sel) => selectors.push(sel),
+                Ok(sel) => matchers.push(Matcher::new(sel)),
                 Err(e) => eprintln!("[MoQTail] selector error: {}", e),
             }
         }
     }
 
-    let ctx = Box::new(PluginContext { selectors });
+    let ctx = Box::new(PluginContext { matchers });
     let ctx_ptr = Box::into_raw(ctx) as *mut c_void;
     *userdata = ctx_ptr;
 
     mosquitto_callback_register(
-        identifier,
+        identifier as *mut mosquitto_plugin_id_t,
         MOSQ_EVT_MESSAGE,
         Some(on_message),
         std::ptr::null(),
@@ -169,10 +86,10 @@ pub unsafe extern "C" fn mosquitto_plugin_init(
 pub unsafe extern "C" fn mosquitto_plugin_cleanup(
     identifier: *mut c_void,
     userdata: *mut c_void,
-    _options: *mut MosquittoOpt,
+    _options: *mut mosquitto_opt,
     _option_count: c_int,
 ) -> c_int {
-    let _ = mosquitto_callback_unregister(identifier, MOSQ_EVT_MESSAGE, Some(on_message), std::ptr::null());
+    let _ = mosquitto_callback_unregister(identifier as *mut mosquitto_plugin_id_t, MOSQ_EVT_MESSAGE, Some(on_message), std::ptr::null());
     if !userdata.is_null() {
         drop(Box::from_raw(userdata as *mut PluginContext));
     }
@@ -184,7 +101,8 @@ mod tests {
     use super::*;
     use std::ffi::CString;
 
-    static mut REGISTERED: Option<(extern "C" fn(c_int, *mut c_void, *mut c_void) -> c_int, *mut c_void)> = None;
+    #[no_mangle]
+    pub static mut REGISTERED: Option<(extern "C" fn(c_int, *mut c_void, *mut c_void) -> c_int, *mut c_void)> = None;
 
     #[no_mangle]
     unsafe extern "C" fn mosquitto_callback_register(
@@ -216,24 +134,25 @@ mod tests {
         unsafe {
             let key = CString::new("selector").unwrap();
             let val = CString::new("/foo/+" ).unwrap();
-            let mut opt = MosquittoOpt { key: key.as_ptr(), value: val.as_ptr() };
+            let mut opt = mosquitto_opt { key: key.as_ptr() as *mut c_char, value: val.as_ptr() as *mut c_char };
             let mut userdata: *mut c_void = std::ptr::null_mut();
 
             assert_eq!(mosquitto_plugin_init(std::ptr::null_mut(), &mut userdata, &mut opt, 1), MOSQ_ERR_SUCCESS);
             let (cb, ctx) = REGISTERED.expect("callback registered");
 
             let topic1 = CString::new("foo/bar").unwrap();
-            let mut msg = MosquittoEvtMessage {
-                _future: std::ptr::null_mut(),
-                _client: std::ptr::null_mut(),
+            let mut msg = mosquitto_evt_message {
+                future: std::ptr::null_mut(),
+                client: std::ptr::null_mut(),
                 topic: topic1.as_ptr() as *mut c_char,
-                _payload: std::ptr::null_mut(),
-                _properties: std::ptr::null_mut(),
-                _reason_string: std::ptr::null_mut(),
-                _payloadlen: 0,
-                _qos: 0,
-                _reason_code: 0,
-                _retain: false,
+                payload: std::ptr::null_mut(),
+                properties: std::ptr::null_mut(),
+                reason_string: std::ptr::null_mut(),
+                payloadlen: 0,
+                qos: 0,
+                reason_code: 0,
+                retain: false,
+                future2: [std::ptr::null_mut(); 4],
             };
 
             assert_eq!(cb(MOSQ_EVT_MESSAGE, &mut msg as *mut _ as *mut c_void, ctx), MOSQ_ERR_SUCCESS);
