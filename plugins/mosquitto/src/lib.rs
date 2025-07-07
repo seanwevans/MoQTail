@@ -5,8 +5,9 @@
 //! callback.  Incoming messages are filtered before they reach the broker
 //! clients.
 
-use moqtail_core::{compile, Matcher};
-use std::{ffi::CStr, os::raw::{c_char, c_int, c_void}};
+use moqtail_core::{compile, Matcher, Message};
+use serde_json::Value as JsonValue;
+use std::{collections::HashMap, ffi::CStr, os::raw::{c_char, c_int, c_void}, slice};
 
 // Bindings generated in build.rs
 include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
@@ -32,8 +33,23 @@ extern "C" fn on_message(_: c_int, event_data: *mut c_void, userdata: *mut c_voi
             Ok(t) => t,
             Err(_) => return 1,
         };
+
+        let mut headers = HashMap::new();
+        headers.insert("qos".to_string(), msg.qos.to_string());
+
+        let payload = if !msg.payload.is_null() && msg.payloadlen > 0 {
+            let bytes = slice::from_raw_parts(msg.payload as *const u8, msg.payloadlen as usize);
+            match serde_json::from_slice::<JsonValue>(bytes) {
+                Ok(j) => Some(j),
+                Err(_) => None,
+            }
+        } else {
+            None
+        };
+
+        let m = Message { topic, headers, payload };
         for matcher in &ctx.matchers {
-            if matcher.matches(topic) {
+            if matcher.matches(&m) {
                 return MOSQ_ERR_SUCCESS;
             }
         }
