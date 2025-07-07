@@ -1,0 +1,11 @@
+[package]
+name = "moqtail-cli"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+moqtail-core = { path = "../moqtail-core" }
+
+[dependencies.clap]
+version = "4"
+features = ["derive"]
