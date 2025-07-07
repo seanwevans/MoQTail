@@ -29,4 +29,9 @@ mod tests {
         assert!(compile("/fo$").is_err());
 
     }
+
+    #[test]
+    fn hello_returns_greeting() {
+        assert_eq!(hello(), "Hello, MoQtail!");
+    }
 }
