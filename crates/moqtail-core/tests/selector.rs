@@ -1,5 +1,5 @@
 use moqtail_core::{
-    ast::{Axis, Field, Operator, Segment, Selector, Step, Predicate, Value},
+    ast::{Axis, Field, Operator, Predicate, Segment, Selector, Step, Value},
     compile,
 };
 
@@ -84,7 +84,11 @@ fn parse_header_axis() {
             Step {
                 axis: Axis::Child,
                 segment: Segment::Message,
-                predicates: vec![Predicate { field: Field::Header("qos".into()), op: Operator::Le, value: Value::Number(1) }],
+                predicates: vec![Predicate {
+                    field: Field::Header("qos".into()),
+                    op: Operator::Le,
+                    value: Value::Number(1)
+                }],
             },
             Step {
                 axis: Axis::Child,
@@ -103,7 +107,11 @@ fn parse_json_predicate() {
         Selector(vec![Step {
             axis: Axis::Child,
             segment: Segment::Literal("foo".into()),
-            predicates: vec![Predicate { field: Field::Json(vec!["temp".into()]), op: Operator::Gt, value: Value::Number(30) }],
+            predicates: vec![Predicate {
+                field: Field::Json(vec!["temp".into()]),
+                op: Operator::Gt,
+                value: Value::Number(30)
+            }],
         }])
     );
 }

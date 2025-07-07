@@ -15,5 +15,4 @@ fn sub_errors_on_invalid_selector() {
     cmd.assert()
         .failure()
         .stderr(contains("Failed to compile selector"));
-
 }

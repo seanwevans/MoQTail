@@ -27,7 +27,6 @@ mod tests {
         assert!(compile("foo/bar").is_err());
         assert!(compile("/foo//").is_err());
         assert!(compile("/fo$").is_err());
-
     }
 
     #[test]

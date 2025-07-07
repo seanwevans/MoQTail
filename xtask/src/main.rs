@@ -1,7 +1,7 @@
-use std::collections::{HashMap, HashSet};
 use anyhow::Result;
-use clap::{Parser, Subcommand};
 use cargo_metadata::{MetadataCommand, PackageId};
+use clap::{Parser, Subcommand};
+use std::collections::{HashMap, HashSet};
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
