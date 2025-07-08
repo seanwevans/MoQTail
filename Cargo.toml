@@ -6,4 +6,10 @@ members = [
     "bindings/python",
     "bindings/js",
 ]
+default-members = [
+    "xtask",
+    "crates/moqtail-core",
+    "crates/moqtail-cli",
+    "bindings/js",
+]
 resolver = "2"
