@@ -1,6 +1,6 @@
 use crate::ast::{Axis, Field, Operator, Predicate, Segment, Selector, Stage, Step, Value};
 use serde_json::Value as JsonValue;
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 
 pub struct Message<'a> {
     pub topic: &'a str,
@@ -10,7 +10,7 @@ pub struct Message<'a> {
 
 pub struct Matcher {
     selector: Selector,
-    window: Vec<f64>,
+    window: VecDeque<f64>,
     window_size: usize,
 }
 
@@ -26,7 +26,7 @@ impl Matcher {
             .unwrap_or(1);
         Self {
             selector,
-            window: Vec::new(),
+            window: VecDeque::new(),
             window_size,
         }
     }
@@ -223,9 +223,9 @@ impl Matcher {
     }
 
     fn push_value(&mut self, v: f64) {
-        self.window.push(v);
+        self.window.push_back(v);
         if self.window.len() > self.window_size {
-            self.window.remove(0);
+            self.window.pop_front();
         }
     }
 }
