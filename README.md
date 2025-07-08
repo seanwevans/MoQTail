@@ -41,6 +41,12 @@ $ cargo install moqtail-cli
 
 # 2. Subscribe to high‑temperature alerts
 $ moqtail sub "//sensor[@type='temp'][json$.value > 30]"
+
+# Use a different broker address
+$ moqtail sub --host broker.example.com --port 1884 "//sensor"
+
+# Only check that the query compiles
+$ moqtail sub --dry-run "//sensor"
 ```
 
 ```bash

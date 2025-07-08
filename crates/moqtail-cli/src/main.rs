@@ -16,6 +16,15 @@ enum Commands {
     Sub {
         /// Query selector string
         query: String,
+        /// Broker hostname
+        #[arg(long, default_value = "localhost")]
+        host: String,
+        /// Broker port
+        #[arg(long, default_value_t = 1883)]
+        port: u16,
+        /// Only compile selector without connecting
+        #[arg(long)]
+        dry_run: bool,
     },
 }
 
@@ -23,14 +32,19 @@ fn main() {
     let cli = Cli::parse();
 
     match cli.command {
-        Commands::Sub { query } => match compile(&query) {
+        Commands::Sub {
+            query,
+            host,
+            port,
+            dry_run,
+        } => match compile(&query) {
             Ok(selector) => {
                 println!("{selector}");
-                if std::env::var("MOQTAIL_DRY_RUN").is_ok() {
+                if dry_run {
                     return;
                 }
 
-                let mut mqttoptions = MqttOptions::new("moqtail-cli", "localhost", 1883);
+                let mut mqttoptions = MqttOptions::new("moqtail-cli", host, port);
                 mqttoptions.set_keep_alive(Duration::from_secs(5));
 
                 let (client, mut connection) = Client::new(mqttoptions, 10);
