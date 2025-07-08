@@ -35,8 +35,10 @@ This guide explains the project layout, coding standards, and pull‑request wor
 
 * **Rust** 1.78+ (install via [`rustup`](https://rustup.rs)).
 * **Node.js** 20+ (only if you hack on the JS bindings).
+* **Python** 3 with development headers (needed for `moqtail-python`; e.g. `sudo apt-get install python3-dev`, set `PYO3_PYTHON=$(which python3)` if multiple versions).
 * **GNU Make** (used by `Makefile` shortcuts).
 * **Docker** (optional, for broker plugin testing).
+> **Tip:** On Debian/Ubuntu install the Python development headers with `sudo apt-get install python3-dev`. If you maintain multiple Python versions, set `PYO3_PYTHON=$(which python3)` before building the bindings.
 
 ### Setup
 
