@@ -2,6 +2,17 @@
 
 This plugin integrates the MoQTail selector engine into the Mosquitto broker. It parses one or more `plugin_opt_selector` options and filters publish events before they reach subscribing clients.
 
+## System Dependencies
+
+The build links against Mosquitto's C library. Make sure the development
+headers are installed before compiling:
+
+```bash
+sudo apt-get install libmosquitto-dev
+```
+
+Without these headers the plugin cannot be built.
+
 ## Building
 
 ```bash
