@@ -41,8 +41,8 @@ This guide explains the project layout, coding standards, and pull‑request wor
 > **Tip:** On Debian/Ubuntu install the Python development headers with `sudo apt-get install python3-dev`. If you maintain multiple Python versions, set `PYO3_PYTHON=$(which python3)` before building the bindings.
 
 > **Note:** The `bindings/python` crate depends on PyO3 and isn't built by default.
-> CI skips it via `--workspace --exclude moqtail-python`. Enable it only when the
-> Python prerequisites above are installed.
+> CI and the default pre-commit hook skip it via `--workspace --exclude moqtail-python`.
+> Enable it only when the Python prerequisites above are installed.
 
 ### Setup
 
@@ -109,7 +109,8 @@ $ ./scripts/install-git-hooks.sh
 
 It symlinks (or copies if necessary) every file in `scripts/hooks/` to
 `.git/hooks/`. The default `pre-commit` hook runs `cargo fmt`, `cargo clippy`,
-and a small test suite so issues are caught before you push.
+and `cargo test --workspace --exclude moqtail-python --quiet` so issues are
+caught before you push.
 
 ---
 
