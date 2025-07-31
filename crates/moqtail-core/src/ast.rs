@@ -77,6 +77,16 @@ impl fmt::Display for Selector {
                 Segment::Hash => write!(f, "#")?,
                 Segment::Message => write!(f, "msg")?,
             }
+
+            for pred in &step.predicates {
+                write!(
+                    f,
+                    "[{}{}{}]",
+                    display_field(&pred.field),
+                    display_op(pred.op),
+                    display_value(&pred.value)
+                )?;
+            }
         }
         for stage in &self.stages {
             match stage {
@@ -97,5 +107,22 @@ fn display_field(fld: &Field) -> String {
             "json${}",
             parts.iter().map(|p| format!(".{p}")).collect::<String>()
         ),
+    }
+}
+
+fn display_op(op: Operator) -> &'static str {
+    match op {
+        Operator::Eq => "=",
+        Operator::Lt => "<",
+        Operator::Gt => ">",
+        Operator::Le => "<=",
+        Operator::Ge => ">=",
+    }
+}
+
+fn display_value(val: &Value) -> String {
+    match val {
+        Value::Number(n) => n.to_string(),
+        Value::Bool(b) => b.to_string(),
     }
 }
