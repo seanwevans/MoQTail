@@ -5,7 +5,7 @@ mod matcher;
 mod parser;
 
 pub use matcher::{Matcher, Message};
-pub use parser::compile;
+pub use parser::{compile, Error};
 
 pub fn hello() -> &'static str {
     "Hello, MoQtail!"

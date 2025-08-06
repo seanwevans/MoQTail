@@ -6,7 +6,7 @@ use napi_derive::napi;
 fn compile(query: String) -> Result<String, Error> {
     core_compile(&query)
         .map(|sel| sel.to_string())
-        .map_err(Error::from_reason)
+        .map_err(|e| Error::from_reason(e.to_string()))
 }
 
 #[napi]
