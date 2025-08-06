@@ -48,13 +48,21 @@ fn main() {
                 mqttoptions.set_keep_alive(Duration::from_secs(5));
 
                 let (client, mut connection) = Client::new(mqttoptions, 10);
-                client
-                    .subscribe(selector.to_string(), QoS::AtMostOnce)
-                    .unwrap();
+                if let Err(e) = client.subscribe(selector.to_string(), QoS::AtMostOnce) {
+                    eprintln!("Failed to subscribe: {e}");
+                    std::process::exit(1);
+                }
 
-                for event in connection.iter().flatten() {
-                    if let Event::Incoming(Incoming::Publish(p)) = event {
-                        println!("{}: {}", p.topic, String::from_utf8_lossy(&p.payload));
+                for event in connection.iter() {
+                    match event {
+                        Ok(Event::Incoming(Incoming::Publish(p))) => {
+                            println!("{}: {}", p.topic, String::from_utf8_lossy(&p.payload));
+                        }
+                        Ok(_) => {}
+                        Err(e) => {
+                            eprintln!("Connection error: {e}");
+                            std::process::exit(1);
+                        }
                     }
                 }
             }
