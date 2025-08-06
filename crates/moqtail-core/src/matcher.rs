@@ -45,23 +45,35 @@ impl Matcher {
             return None;
         }
         let mut result = None;
-        for stage in self.selector.stages.clone() {
+        let stages = &self.selector.stages;
+        let window_size = self.window_size;
+        let window = &mut self.window;
+        for stage in stages {
             match stage {
                 Stage::Window(_) => {}
                 Stage::Sum(field) => {
-                    let v = Self::extract_field(&field, msg)?;
-                    self.push_value(v);
-                    result = Some(self.window.iter().sum());
+                    let v = Self::extract_field(field, msg)?;
+                    window.push_back(v);
+                    if window.len() > window_size {
+                        window.pop_front();
+                    }
+                    result = Some(window.iter().sum());
                 }
                 Stage::Avg(field) => {
-                    let v = Self::extract_field(&field, msg)?;
-                    self.push_value(v);
-                    let sum: f64 = self.window.iter().sum();
-                    result = Some(sum / self.window.len() as f64);
+                    let v = Self::extract_field(field, msg)?;
+                    window.push_back(v);
+                    if window.len() > window_size {
+                        window.pop_front();
+                    }
+                    let sum: f64 = window.iter().sum();
+                    result = Some(sum / window.len() as f64);
                 }
                 Stage::Count => {
-                    self.push_value(0.0);
-                    result = Some(self.window.len() as f64);
+                    window.push_back(0.0);
+                    if window.len() > window_size {
+                        window.pop_front();
+                    }
+                    result = Some(window.len() as f64);
                 }
             }
         }
@@ -222,12 +234,6 @@ impl Matcher {
         }
     }
 
-    fn push_value(&mut self, v: f64) {
-        self.window.push_back(v);
-        if self.window.len() > self.window_size {
-            self.window.pop_front();
-        }
-    }
 }
 
 #[cfg(test)]
