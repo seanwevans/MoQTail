@@ -5,7 +5,7 @@ use pyo3::prelude::*;
 fn compile(query: &str) -> PyResult<String> {
     core_compile(query)
         .map(|sel| sel.to_string())
-        .map_err(pyo3::exceptions::PyValueError::new_err)
+        .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))
 }
 
 #[pyfunction]
