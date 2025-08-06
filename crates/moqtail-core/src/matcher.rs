@@ -81,9 +81,6 @@ impl Matcher {
                     if Self::match_child(step, &steps[1..], &topic[idx..], msg) {
                         return true;
                     }
-                    if idx == topic.len() {
-                        break;
-                    }
                 }
                 false
             }
