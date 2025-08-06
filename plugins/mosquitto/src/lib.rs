@@ -41,7 +41,10 @@ extern "C" fn on_message(_: c_int, event_data: *mut c_void, userdata: *mut c_voi
             let bytes = slice::from_raw_parts(msg.payload as *const u8, msg.payloadlen as usize);
             match serde_json::from_slice::<JsonValue>(bytes) {
                 Ok(j) => Some(j),
-                Err(_) => None,
+                Err(e) => {
+                    eprintln!("[MoQTail] payload JSON parse error: {}", e);
+                    return 1;
+                }
             }
         } else {
             None
