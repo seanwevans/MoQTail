@@ -14,6 +14,7 @@ include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 
 const MOSQ_EVT_MESSAGE: c_int = 7;
 const MOSQ_ERR_SUCCESS: c_int = 0;
+const MOSQ_ERR_PLUGIN_DEFER: c_int = 17;
 
 // Use generated types `mosquitto_evt_message` and `mosquitto_opt`
 
@@ -31,7 +32,7 @@ extern "C" fn on_message(_: c_int, event_data: *mut c_void, userdata: *mut c_voi
         }
         let topic = match CStr::from_ptr(msg.topic).to_str() {
             Ok(t) => t,
-            Err(_) => return 1,
+            Err(_) => return MOSQ_ERR_PLUGIN_DEFER,
         };
 
         let mut headers = HashMap::new();
@@ -43,7 +44,7 @@ extern "C" fn on_message(_: c_int, event_data: *mut c_void, userdata: *mut c_voi
                 Ok(j) => Some(j),
                 Err(e) => {
                     eprintln!("[MoQTail] payload JSON parse error: {}", e);
-                    return 1;
+                    return MOSQ_ERR_PLUGIN_DEFER;
                 }
             }
         } else {
@@ -57,7 +58,7 @@ extern "C" fn on_message(_: c_int, event_data: *mut c_void, userdata: *mut c_voi
             }
         }
     }
-    1
+    MOSQ_ERR_PLUGIN_DEFER
 }
 
 // Generated bindings provide `mosquitto_opt`
@@ -178,7 +179,7 @@ mod tests {
 
             let topic2 = CString::new("baz/qux").unwrap();
             msg.topic = topic2.as_ptr() as *mut c_char;
-            assert_eq!(cb(MOSQ_EVT_MESSAGE, &mut msg as *mut _ as *mut c_void, ctx), 1);
+            assert_eq!(cb(MOSQ_EVT_MESSAGE, &mut msg as *mut _ as *mut c_void, ctx), MOSQ_ERR_PLUGIN_DEFER);
 
             mosquitto_plugin_cleanup(std::ptr::null_mut(), userdata, std::ptr::null_mut(), 0);
             assert!(REGISTERED.is_none());
