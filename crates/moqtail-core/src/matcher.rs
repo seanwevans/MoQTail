@@ -8,26 +8,42 @@ pub struct Message<'a> {
     pub payload: Option<JsonValue>,
 }
 
+enum StageState {
+    Window { size: usize, values: VecDeque<f64> },
+    Counter { size: usize, values: VecDeque<()> },
+}
+
 pub struct Matcher {
     selector: Selector,
-    window: VecDeque<f64>,
-    window_size: usize,
+    stage_states: Vec<StageState>,
 }
 
 impl Matcher {
     pub fn new(selector: Selector) -> Self {
-        let window_size = selector
-            .stages
-            .iter()
-            .find_map(|s| match s {
-                Stage::Window(n) => Some(*n as usize),
-                _ => None,
-            })
-            .unwrap_or(1);
+        let mut window_size = 1usize;
+        let mut stage_states = Vec::new();
+        for stage in &selector.stages {
+            match stage {
+                Stage::Window(n) => {
+                    window_size = *n as usize;
+                }
+                Stage::Sum(_) | Stage::Avg(_) => {
+                    stage_states.push(StageState::Window {
+                        size: window_size,
+                        values: VecDeque::new(),
+                    });
+                }
+                Stage::Count => {
+                    stage_states.push(StageState::Counter {
+                        size: window_size,
+                        values: VecDeque::new(),
+                    });
+                }
+            }
+        }
         Self {
             selector,
-            window: VecDeque::new(),
-            window_size,
+            stage_states,
         }
     }
 
@@ -45,35 +61,43 @@ impl Matcher {
             return None;
         }
         let mut result = None;
-        let stages = &self.selector.stages;
-        let window_size = self.window_size;
-        let window = &mut self.window;
-        for stage in stages {
+        let mut state_idx = 0;
+        for stage in &self.selector.stages {
             match stage {
                 Stage::Window(_) => {}
                 Stage::Sum(field) => {
-                    let v = Self::extract_field(field, msg)?;
-                    window.push_back(v);
-                    if window.len() > window_size {
-                        window.pop_front();
+                    if let StageState::Window { size, values } = &mut self.stage_states[state_idx] {
+                        let v = Self::extract_field(field, msg)?;
+                        values.push_back(v);
+                        if values.len() > *size {
+                            values.pop_front();
+                        }
+                        result = Some(values.iter().sum());
                     }
-                    result = Some(window.iter().sum());
+                    state_idx += 1;
                 }
                 Stage::Avg(field) => {
-                    let v = Self::extract_field(field, msg)?;
-                    window.push_back(v);
-                    if window.len() > window_size {
-                        window.pop_front();
+                    if let StageState::Window { size, values } = &mut self.stage_states[state_idx] {
+                        let v = Self::extract_field(field, msg)?;
+                        values.push_back(v);
+                        if values.len() > *size {
+                            values.pop_front();
+                        }
+                        let sum: f64 = values.iter().sum();
+                        result = Some(sum / values.len() as f64);
                     }
-                    let sum: f64 = window.iter().sum();
-                    result = Some(sum / window.len() as f64);
+                    state_idx += 1;
                 }
                 Stage::Count => {
-                    window.push_back(0.0);
-                    if window.len() > window_size {
-                        window.pop_front();
+                    if let StageState::Counter { size, values } = &mut self.stage_states[state_idx]
+                    {
+                        values.push_back(());
+                        if values.len() > *size {
+                            values.pop_front();
+                        }
+                        result = Some(values.len() as f64);
                     }
-                    result = Some(window.len() as f64);
+                    state_idx += 1;
                 }
             }
         }
@@ -230,7 +254,6 @@ impl Matcher {
             }
         }
     }
-
 }
 
 #[cfg(test)]
