@@ -85,14 +85,23 @@ impl Matcher {
             return topic.is_empty();
         }
         let step = &steps[0];
+        let rest = &steps[1..];
+        let preds_ok = Self::predicates_match(&step.predicates, msg);
+
+        if !preds_ok {
+            return false;
+        }
+
         match step.axis {
-            Axis::Child => Self::match_child(step, &steps[1..], topic, msg),
+            Axis::Child => Self::match_child(step, rest, topic, msg),
             Axis::Descendant => {
                 // try to match at current or any subsequent position
-                for idx in 0..=topic.len() {
-                    if Self::match_child(step, &steps[1..], &topic[idx..], msg) {
+                let mut idx = 0;
+                while idx <= topic.len() {
+                    if Self::match_child(step, rest, &topic[idx..], msg) {
                         return true;
                     }
+                    idx += 1;
                 }
                 false
             }
@@ -104,11 +113,7 @@ impl Matcher {
             Segment::Literal(ref lit) => {
                 if let Some((first, rest_topic)) = topic.split_first() {
                     if lit == first {
-                        if Self::predicates_match(&step.predicates, msg) {
-                            Self::match_steps(rest, rest_topic, msg)
-                        } else {
-                            false
-                        }
+                        Self::match_steps(rest, rest_topic, msg)
                     } else {
                         false
                     }
@@ -118,36 +123,26 @@ impl Matcher {
             }
             Segment::Plus => {
                 if let Some((_first, rest_topic)) = topic.split_first() {
-                    if Self::predicates_match(&step.predicates, msg) {
-                        Self::match_steps(rest, rest_topic, msg)
-                    } else {
-                        false
-                    }
+                    Self::match_steps(rest, rest_topic, msg)
                 } else {
                     false
                 }
             }
             Segment::Hash => {
                 // Try zero or more segments
-                if Self::predicates_match(&step.predicates, msg)
-                    && Self::match_steps(rest, topic, msg)
-                {
+                if Self::match_steps(rest, topic, msg) {
                     return true;
                 }
-                for idx in 0..topic.len() {
+                let mut idx = 0;
+                while idx < topic.len() {
                     if Self::match_steps(rest, &topic[idx + 1..], msg) {
                         return true;
                     }
+                    idx += 1;
                 }
                 false
             }
-            Segment::Message => {
-                if Self::predicates_match(&step.predicates, msg) {
-                    Self::match_steps(rest, topic, msg)
-                } else {
-                    false
-                }
-            }
+            Segment::Message => Self::match_steps(rest, topic, msg),
         }
     }
 
@@ -230,7 +225,6 @@ impl Matcher {
             }
         }
     }
-
 }
 
 #[cfg(test)]
