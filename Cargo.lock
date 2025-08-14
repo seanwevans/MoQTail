@@ -539,6 +539,7 @@ dependencies = [
  "pest",
  "pest_derive",
  "serde_json",
+ "thiserror 1.0.69",
 ]
 
 [[package]]
