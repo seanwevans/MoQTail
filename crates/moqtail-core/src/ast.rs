@@ -31,6 +31,7 @@ pub enum Operator {
 pub enum Value {
     Number(f64),
     Bool(bool),
+    Str(String),
 }
 
 #[derive(Debug, PartialEq)]
@@ -124,5 +125,6 @@ fn display_value(val: &Value) -> String {
     match val {
         Value::Number(n) => n.to_string(),
         Value::Bool(b) => b.to_string(),
+        Value::Str(s) => format!("\"{}\"", s),
     }
 }

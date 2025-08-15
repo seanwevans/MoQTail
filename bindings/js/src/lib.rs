@@ -1,4 +1,4 @@
-use moqtail_core::{compile as core_compile, hello as core_hello};
+use moqtail_core::compile as core_compile;
 use napi::Error;
 use napi_derive::napi;
 
@@ -9,11 +9,6 @@ fn compile(query: String) -> Result<String, Error> {
         .map_err(|e| Error::from_reason(e.to_string()))
 }
 
-#[napi]
-fn hello() -> &'static str {
-    core_hello()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -21,10 +16,5 @@ mod tests {
     #[test]
     fn compile_returns_string() {
         assert_eq!(compile("/foo".into()).unwrap(), "/foo");
-    }
-
-    #[test]
-    fn hello_returns_greeting() {
-        assert_eq!(hello(), "Hello, MoQtail!");
     }
 }

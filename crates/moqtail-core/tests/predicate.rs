@@ -28,6 +28,7 @@ fn json_predicate_match() {
 }
 
 #[test]
+
 fn header_predicate_negative_fractional() {
     let sel = compile("/msg[temp<=-1.5]").unwrap();
     let msg = Message {

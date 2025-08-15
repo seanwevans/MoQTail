@@ -24,7 +24,9 @@ number = { "-"? ~ ASCII_DIGIT+ ~ ("." ~ ASCII_DIGIT+)? }
 
 boolean = { "true" | "false" }
 
-value = { boolean | number }
+string = { "\"" ~ (!"\"" ~ ANY)* ~ "\"" }
+
+value = { boolean | number | string }
 
 stage = { pipe ~ function }
 pipe = _{ "|>" }

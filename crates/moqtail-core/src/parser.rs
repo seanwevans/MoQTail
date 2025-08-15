@@ -117,6 +117,10 @@ pub fn compile(input: &str) -> Result<Selector, Error> {
                     let value = match value_inner.as_rule() {
                         Rule::number => Value::Number(value_inner.as_str().parse::<f64>()?),
                         Rule::boolean => Value::Bool(value_inner.as_str() == "true"),
+                        Rule::string => {
+                            let s = value_inner.as_str();
+                            Value::Str(s[1..s.len() - 1].to_string())
+                        }
                         _ => return Err(Error::InvalidValue),
                     };
 
@@ -144,7 +148,13 @@ fn parse_field(inner_field: pest::iterators::Pair<Rule>) -> Field {
         Rule::ident => Field::Header(inner_field.as_str().to_string()),
         Rule::json_field => {
             let text = inner_field.as_str();
-            let without = text.trim_start_matches("json$");
+            let without = match text.strip_prefix("json$") {
+                Some(rest) => rest,
+                None => {
+                    // this should be unreachable as the grammar guarantees the prefix
+                    ""
+                }
+            };
             let parts: Vec<String> = without
                 .split('.')
                 .filter(|p| !p.is_empty())
