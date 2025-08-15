@@ -28,11 +28,12 @@ fn json_predicate_match() {
 }
 
 #[test]
-fn header_predicate_string_match() {
-    let sel = compile("/msg[ty=\"text\"]").unwrap();
+
+fn header_predicate_negative_fractional() {
+    let sel = compile("/msg[temp<=-1.5]").unwrap();
     let msg = Message {
         topic: "",
-        headers: HashMap::from([("ty".to_string(), "text".to_string())]),
+        headers: HashMap::from([("temp".to_string(), "-1.5".to_string())]),
         payload: None,
     };
     let m = Matcher::new(sel);
@@ -40,9 +41,9 @@ fn header_predicate_string_match() {
 }
 
 #[test]
-fn json_predicate_string_match() {
-    let sel = compile("/foo[json$.status=\"ok\"]").unwrap();
-    let payload = json!({"status": "ok"});
+fn json_predicate_fractional() {
+    let sel = compile("/foo[json$.temp>=32.5]").unwrap();
+    let payload = json!({"temp": 33.1});
     let msg = Message {
         topic: "foo",
         headers: HashMap::new(),

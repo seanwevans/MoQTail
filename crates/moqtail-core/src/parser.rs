@@ -10,6 +10,8 @@ pub enum Error {
     Pest(#[from] pest::error::Error<Rule>),
     #[error(transparent)]
     ParseInt(#[from] std::num::ParseIntError),
+    #[error(transparent)]
+    ParseFloat(#[from] std::num::ParseFloatError),
     #[error("missing selector")]
     MissingSelector,
     #[error("missing axis")]
@@ -113,7 +115,7 @@ pub fn compile(input: &str) -> Result<Selector, Error> {
                     let value_pair = pred_inner.next().ok_or(Error::MissingValue)?;
                     let value_inner = value_pair.into_inner().next().ok_or(Error::MissingValue)?;
                     let value = match value_inner.as_rule() {
-                        Rule::number => Value::Number(value_inner.as_str().parse::<i64>()?),
+                        Rule::number => Value::Number(value_inner.as_str().parse::<f64>()?),
                         Rule::boolean => Value::Bool(value_inner.as_str() == "true"),
                         Rule::string => {
                             let s = value_inner.as_str();

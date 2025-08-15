@@ -15,7 +15,7 @@ fn parse_selector_with_predicate() {
                 predicates: vec![Predicate {
                     field: Field::Header("bar".into()),
                     op: Operator::Eq,
-                    value: Value::Number(1)
+                    value: Value::Number(1.0)
                 }],
             }],
             stages: vec![],
@@ -97,7 +97,7 @@ fn parse_header_axis() {
                     predicates: vec![Predicate {
                         field: Field::Header("qos".into()),
                         op: Operator::Le,
-                        value: Value::Number(1)
+                        value: Value::Number(1.0)
                     }],
                 },
                 Step {
@@ -123,7 +123,27 @@ fn parse_json_predicate() {
                 predicates: vec![Predicate {
                     field: Field::Json(vec!["temp".into()]),
                     op: Operator::Gt,
-                    value: Value::Number(30)
+                    value: Value::Number(30.0)
+                }],
+            }],
+            stages: vec![],
+        }
+    );
+}
+
+#[test]
+fn parse_negative_fractional_number() {
+    let sel = compile("/foo[bar=-1.5]").unwrap();
+    assert_eq!(
+        sel,
+        Selector {
+            steps: vec![Step {
+                axis: Axis::Child,
+                segment: Segment::Literal("foo".into()),
+                predicates: vec![Predicate {
+                    field: Field::Header("bar".into()),
+                    op: Operator::Eq,
+                    value: Value::Number(-1.5)
                 }],
             }],
             stages: vec![],
