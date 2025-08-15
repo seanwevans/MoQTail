@@ -26,3 +26,28 @@ fn json_predicate_match() {
     let m = Matcher::new(sel);
     assert!(m.matches(&msg));
 }
+
+#[test]
+fn header_predicate_string_match() {
+    let sel = compile("/msg[ty=\"text\"]").unwrap();
+    let msg = Message {
+        topic: "",
+        headers: HashMap::from([("ty".to_string(), "text".to_string())]),
+        payload: None,
+    };
+    let m = Matcher::new(sel);
+    assert!(m.matches(&msg));
+}
+
+#[test]
+fn json_predicate_string_match() {
+    let sel = compile("/foo[json$.status=\"ok\"]").unwrap();
+    let payload = json!({"status": "ok"});
+    let msg = Message {
+        topic: "foo",
+        headers: HashMap::new(),
+        payload: Some(payload),
+    };
+    let m = Matcher::new(sel);
+    assert!(m.matches(&msg));
+}

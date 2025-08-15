@@ -188,8 +188,10 @@ impl Matcher {
                 };
                 if let Ok(num) = hv.parse::<i64>() {
                     Value::Number(num)
-                } else {
+                } else if hv == "true" || hv == "false" {
                     Value::Bool(hv == "true")
+                } else {
+                    Value::Str(hv.clone())
                 }
             }
             Field::Json(ref path) => {
@@ -207,6 +209,8 @@ impl Matcher {
                     Value::Bool(b)
                 } else if let Some(n) = cur.as_i64() {
                     Value::Number(n)
+                } else if let Some(s) = cur.as_str() {
+                    Value::Str(s.to_string())
                 } else {
                     return false;
                 }
@@ -226,6 +230,10 @@ impl Matcher {
                 Operator::Ge => l >= r,
             },
             (Value::Bool(l), Value::Bool(r)) => match op {
+                Operator::Eq => l == r,
+                _ => false,
+            },
+            (Value::Str(l), Value::Str(r)) => match op {
                 Operator::Eq => l == r,
                 _ => false,
             },
