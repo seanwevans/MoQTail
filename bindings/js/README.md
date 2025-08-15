@@ -16,5 +16,5 @@ These bindings expose `moqtail-core` to Node.js using [napi-rs](https://napi.rs/
 The resulting `moqtail-js.node` binary will be placed next to `index.js` and can be required as:
 
 ```javascript
-const { compile, hello } = require('moqtail-js');
+const { compile } = require('moqtail-js');
 ```

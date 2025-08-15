@@ -7,10 +7,6 @@ mod parser;
 pub use matcher::{Matcher, Message};
 pub use parser::{compile, Error};
 
-pub fn hello() -> &'static str {
-    "Hello, MoQtail!"
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -27,10 +23,5 @@ mod tests {
         assert!(compile("foo/bar").is_err());
         assert!(compile("/foo//").is_err());
         assert!(compile("/fo$").is_err());
-    }
-
-    #[test]
-    fn hello_returns_greeting() {
-        assert_eq!(hello(), "Hello, MoQtail!");
     }
 }
