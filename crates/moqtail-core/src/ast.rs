@@ -27,7 +27,11 @@ pub enum Operator {
     Ge,
 }
 
-#[derive(Debug, PartialEq, Clone, Copy)]
+// Value can represent numbers, booleans or strings.  The `Str` variant owns a
+// `String`, which cannot implement the `Copy` trait.  Deriving `Copy` for this
+// enum therefore causes compilation to fail.  We only derive `Clone` to allow
+// duplication when needed while keeping the type non-`Copy`.
+#[derive(Debug, PartialEq, Clone)]
 pub enum Value {
     Number(f64),
     Bool(bool),
