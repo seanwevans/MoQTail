@@ -130,3 +130,8 @@ fn parse_json_predicate() {
         }
     );
 }
+
+#[test]
+fn error_on_malformed_json_prefix() {
+    assert!(compile("/foo[json.temp>30]").is_err());
+}

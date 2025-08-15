@@ -146,7 +146,13 @@ fn parse_field(inner_field: pest::iterators::Pair<Rule>) -> Field {
         Rule::ident => Field::Header(inner_field.as_str().to_string()),
         Rule::json_field => {
             let text = inner_field.as_str();
-            let without = text.trim_start_matches("json$");
+            let without = match text.strip_prefix("json$") {
+                Some(rest) => rest,
+                None => {
+                    // this should be unreachable as the grammar guarantees the prefix
+                    ""
+                }
+            };
             let parts: Vec<String> = without
                 .split('.')
                 .filter(|p| !p.is_empty())
