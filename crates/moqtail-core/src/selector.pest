@@ -20,7 +20,7 @@ wildcard = { "+" | "#" }
 
 ident = { (ASCII_ALPHANUMERIC | "_" | "-")+ }
 
-number = { ASCII_DIGIT+ }
+number = { "-"? ~ ASCII_DIGIT+ ~ ("." ~ ASCII_DIGIT+)? }
 
 boolean = { "true" | "false" }
 

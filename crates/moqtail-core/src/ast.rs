@@ -27,20 +27,20 @@ pub enum Operator {
     Ge,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub enum Value {
-    Number(i64),
+    Number(f64),
     Bool(bool),
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq)]
 pub struct Predicate {
     pub field: Field,
     pub op: Operator,
     pub value: Value,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq)]
 pub struct Step {
     pub axis: Axis,
     pub segment: Segment,
@@ -55,7 +55,7 @@ pub enum Stage {
     Count,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq)]
 pub struct Selector {
     pub steps: Vec<Step>,
     pub stages: Vec<Stage>,

@@ -186,7 +186,7 @@ impl Matcher {
                     Some(v) => v,
                     None => return false,
                 };
-                if let Ok(num) = hv.parse::<i64>() {
+                if let Ok(num) = hv.parse::<f64>() {
                     Value::Number(num)
                 } else {
                     Value::Bool(hv == "true")
@@ -205,7 +205,7 @@ impl Matcher {
                 }
                 if let Some(b) = cur.as_bool() {
                     Value::Bool(b)
-                } else if let Some(n) = cur.as_i64() {
+                } else if let Some(n) = cur.as_f64() {
                     Value::Number(n)
                 } else {
                     return false;
