@@ -40,3 +40,33 @@ fn no_match_in_long_topic() {
     };
     assert!(!matcher.matches(&msg));
 }
+
+#[test]
+fn matches_descendant_in_very_long_topic() {
+    let selector = compile("//sensor").unwrap();
+    let matcher = Matcher::new(selector);
+    let topic = build_topic(10_000, "sensor");
+    let msg = Message {
+        topic: &topic,
+        headers: HashMap::new(),
+        payload: None,
+    };
+    assert!(
+        matcher.matches(&msg),
+        "selector should match very long topic: {}",
+        topic
+    );
+}
+
+#[test]
+fn no_match_in_very_long_topic() {
+    let selector = compile("//sensor").unwrap();
+    let matcher = Matcher::new(selector);
+    let topic = build_topic(10_000, "other");
+    let msg = Message {
+        topic: &topic,
+        headers: HashMap::new(),
+        payload: None,
+    };
+    assert!(!matcher.matches(&msg));
+}
