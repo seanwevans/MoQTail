@@ -105,68 +105,64 @@ impl Matcher {
     }
 
     fn match_steps(steps: &[Step], topic: &[&str], msg: &Message) -> bool {
-        if steps.is_empty() {
-            return topic.is_empty();
-        }
-        let step = &steps[0];
-        let rest = &steps[1..];
-        let preds_ok = Self::predicates_match(&step.predicates, msg);
-
-        if !preds_ok {
-            return false;
-        }
-
-        match step.axis {
-            Axis::Child => Self::match_child(step, rest, topic, msg),
-            Axis::Descendant => {
-                // try to match at current or any subsequent position
-                let mut idx = 0;
-                while idx <= topic.len() {
-                    if Self::match_child(step, rest, &topic[idx..], msg) {
-                        return true;
-                    }
-                    idx += 1;
+        let mut stack: Vec<(usize, usize)> = vec![(0, 0)];
+        while let Some((step_idx, topic_idx)) = stack.pop() {
+            if step_idx == steps.len() {
+                if topic_idx == topic.len() {
+                    return true;
                 }
-                false
+                continue;
+            }
+            let step = &steps[step_idx];
+            if !Self::predicates_match(&step.predicates, msg) {
+                continue;
+            }
+            match step.axis {
+                Axis::Child => {
+                    Self::match_child(&mut stack, step, step_idx + 1, topic, topic_idx);
+                }
+                Axis::Descendant => {
+                    let mut start = topic_idx;
+                    while start <= topic.len() {
+                        Self::match_child(&mut stack, step, step_idx + 1, topic, start);
+                        start += 1;
+                    }
+                }
             }
         }
+        false
     }
 
-    fn match_child(step: &Step, rest: &[Step], topic: &[&str], msg: &Message) -> bool {
+    fn match_child(
+        stack: &mut Vec<(usize, usize)>,
+        step: &Step,
+        next_step: usize,
+        topic: &[&str],
+        idx: usize,
+    ) {
         match step.segment {
             Segment::Literal(ref lit) => {
-                if let Some((first, rest_topic)) = topic.split_first() {
-                    if lit == first {
-                        Self::match_steps(rest, rest_topic, msg)
-                    } else {
-                        false
+                if let Some(seg) = topic.get(idx) {
+                    if lit == seg {
+                        stack.push((next_step, idx + 1));
                     }
-                } else {
-                    false
                 }
             }
             Segment::Plus => {
-                if let Some((_first, rest_topic)) = topic.split_first() {
-                    Self::match_steps(rest, rest_topic, msg)
-                } else {
-                    false
+                if topic.get(idx).is_some() {
+                    stack.push((next_step, idx + 1));
                 }
             }
             Segment::Hash => {
-                // Try zero or more segments
-                if Self::match_steps(rest, topic, msg) {
-                    return true;
+                let mut i = idx;
+                while i <= topic.len() {
+                    stack.push((next_step, i));
+                    i += 1;
                 }
-                let mut idx = 0;
-                while idx < topic.len() {
-                    if Self::match_steps(rest, &topic[idx + 1..], msg) {
-                        return true;
-                    }
-                    idx += 1;
-                }
-                false
             }
-            Segment::Message => Self::match_steps(rest, topic, msg),
+            Segment::Message => {
+                stack.push((next_step, idx));
+            }
         }
     }
 
