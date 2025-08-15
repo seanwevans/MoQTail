@@ -115,6 +115,10 @@ pub fn compile(input: &str) -> Result<Selector, Error> {
                     let value = match value_inner.as_rule() {
                         Rule::number => Value::Number(value_inner.as_str().parse::<i64>()?),
                         Rule::boolean => Value::Bool(value_inner.as_str() == "true"),
+                        Rule::string => {
+                            let s = value_inner.as_str();
+                            Value::Str(s[1..s.len() - 1].to_string())
+                        }
                         _ => return Err(Error::InvalidValue),
                     };
 

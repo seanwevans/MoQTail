@@ -27,10 +27,11 @@ pub enum Operator {
     Ge,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Value {
     Number(i64),
     Bool(bool),
+    Str(String),
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -124,5 +125,6 @@ fn display_value(val: &Value) -> String {
     match val {
         Value::Number(n) => n.to_string(),
         Value::Bool(b) => b.to_string(),
+        Value::Str(s) => format!("\"{}\"", s),
     }
 }
