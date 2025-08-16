@@ -49,7 +49,7 @@ fn main() {
 
                 let (client, mut connection) = Client::new(mqttoptions, 10);
                 if let Err(e) = client.subscribe(selector.to_string(), QoS::AtMostOnce) {
-                    eprintln!("Failed to subscribe: {e}");
+                    eprintln!("Connection error: {e}");
                     std::process::exit(1);
                 }
 
