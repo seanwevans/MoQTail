@@ -18,6 +18,14 @@ pub struct Matcher {
     stage_states: Vec<StageState>,
 }
 
+fn json_path<'a>(root: &'a JsonValue, path: &[String]) -> Option<&'a JsonValue> {
+    let mut cur = root;
+    for part in path {
+        cur = cur.get(part)?;
+    }
+    Some(cur)
+}
+
 impl Matcher {
     pub fn new(selector: Selector) -> Self {
         let mut window_size = 1usize;
@@ -191,16 +199,14 @@ impl Matcher {
                 }
             }
             Field::Json(ref path) => {
-                let mut cur = match msg.payload {
-                    Some(ref j) => j,
+                let cur = match msg.payload.as_ref() {
+                    Some(j) => json_path(j, path),
+                    None => None,
+                };
+                let cur = match cur {
+                    Some(v) => v,
                     None => return false,
                 };
-                for part in path {
-                    cur = match cur.get(part) {
-                        Some(v) => v,
-                        None => return false,
-                    };
-                }
                 if let Some(b) = cur.as_bool() {
                     Value::Bool(b)
                 } else if let Some(n) = cur.as_f64() {
@@ -241,14 +247,11 @@ impl Matcher {
         match field {
             Field::Header(name) => msg.headers.get(name)?.parse::<f64>().ok(),
             Field::Json(path) => {
-                let mut cur = msg.payload.as_ref()?;
-                for p in path {
-                    cur = cur.get(p)?;
-                }
-                if let Some(v) = cur.as_f64() {
-                    Some(v)
+                let v = json_path(msg.payload.as_ref()?, path)?;
+                if let Some(f) = v.as_f64() {
+                    Some(f)
                 } else {
-                    cur.as_i64().map(|i| i as f64)
+                    v.as_i64().map(|i| i as f64)
                 }
             }
         }
@@ -259,6 +262,7 @@ impl Matcher {
 mod tests {
     use super::*;
     use crate::parser::compile;
+    use serde_json::json;
     use std::collections::HashMap;
 
     fn make_msg(topic: &str) -> Message<'_> {
@@ -300,5 +304,35 @@ mod tests {
         let m = Matcher::new(sel);
         assert!(m.matches(&make_msg("building/floor/sensor")));
         assert!(!m.matches(&make_msg("building/floor/actuator")));
+    }
+
+    #[test]
+    fn predicate_on_json_field() {
+        let sel = compile("/foo[json$.temp>30]").unwrap();
+        let m = Matcher::new(sel);
+        let msg = Message {
+            topic: "foo",
+            headers: HashMap::new(),
+            payload: Some(json!({"temp": 35})),
+        };
+        assert!(m.matches(&msg));
+
+        let msg = Message {
+            topic: "foo",
+            headers: HashMap::new(),
+            payload: Some(json!({"temp": 25})),
+        };
+        assert!(!m.matches(&msg));
+    }
+
+    #[test]
+    fn extract_json_field() {
+        let msg = Message {
+            topic: "foo",
+            headers: HashMap::new(),
+            payload: Some(json!({"temp": 21})),
+        };
+        let field = Field::Json(vec!["temp".into()]);
+        assert_eq!(Matcher::extract_field(&field, &msg), Some(21.0));
     }
 }
