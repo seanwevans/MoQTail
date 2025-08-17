@@ -259,6 +259,7 @@ impl Matcher {
 mod tests {
     use super::*;
     use crate::parser::compile;
+    use serde_json::json;
     use std::collections::HashMap;
 
     fn make_msg(topic: &str) -> Message<'_> {
@@ -300,5 +301,146 @@ mod tests {
         let m = Matcher::new(sel);
         assert!(m.matches(&make_msg("building/floor/sensor")));
         assert!(!m.matches(&make_msg("building/floor/actuator")));
+    }
+
+    #[test]
+    fn process_sum_without_window() {
+        let sel = compile("/sensor |> sum(temp)").unwrap();
+        let mut m = Matcher::new(sel);
+
+        let msg1 = Message {
+            topic: "sensor",
+            headers: HashMap::from([(String::from("temp"), String::from("10"))]),
+            payload: None,
+        };
+        assert_eq!(m.process(&msg1), Some(10.0));
+
+        let msg2 = Message {
+            topic: "sensor",
+            headers: HashMap::from([(String::from("temp"), String::from("20"))]),
+            payload: None,
+        };
+        assert_eq!(m.process(&msg2), Some(20.0));
+    }
+
+    #[test]
+    fn process_sum_with_window() {
+        let sel = compile("/sensor |> window(2s) |> sum(temp)").unwrap();
+        let mut m = Matcher::new(sel);
+
+        let msg1 = Message {
+            topic: "sensor",
+            headers: HashMap::from([(String::from("temp"), String::from("10"))]),
+            payload: None,
+        };
+        assert_eq!(m.process(&msg1), Some(10.0));
+
+        let msg2 = Message {
+            topic: "sensor",
+            headers: HashMap::from([(String::from("temp"), String::from("20"))]),
+            payload: None,
+        };
+        assert_eq!(m.process(&msg2), Some(30.0));
+
+        let msg3 = Message {
+            topic: "sensor",
+            headers: HashMap::from([(String::from("temp"), String::from("30"))]),
+            payload: None,
+        };
+        assert_eq!(m.process(&msg3), Some(50.0));
+    }
+
+    #[test]
+    fn process_avg_without_window() {
+        let sel = compile("/sensor |> avg(json$.value)").unwrap();
+        let mut m = Matcher::new(sel);
+
+        let msg1 = Message {
+            topic: "sensor",
+            headers: HashMap::new(),
+            payload: Some(json!({"value": 10})),
+        };
+        assert_eq!(m.process(&msg1), Some(10.0));
+
+        let msg2 = Message {
+            topic: "sensor",
+            headers: HashMap::new(),
+            payload: Some(json!({"value": 20})),
+        };
+        assert_eq!(m.process(&msg2), Some(20.0));
+    }
+
+    #[test]
+    fn process_avg_with_window() {
+        let sel = compile("/sensor |> window(2s) |> avg(json$.value)").unwrap();
+        let mut m = Matcher::new(sel);
+
+        let msg1 = Message {
+            topic: "sensor",
+            headers: HashMap::new(),
+            payload: Some(json!({"value": 10})),
+        };
+        assert_eq!(m.process(&msg1), Some(10.0));
+
+        let msg2 = Message {
+            topic: "sensor",
+            headers: HashMap::new(),
+            payload: Some(json!({"value": 20})),
+        };
+        assert_eq!(m.process(&msg2), Some(15.0));
+
+        let msg3 = Message {
+            topic: "sensor",
+            headers: HashMap::new(),
+            payload: Some(json!({"value": 30})),
+        };
+        assert_eq!(m.process(&msg3), Some(25.0));
+    }
+
+    #[test]
+    fn process_count_without_window() {
+        let sel = compile("/sensor |> count()").unwrap();
+        let mut m = Matcher::new(sel);
+
+        let msg1 = Message {
+            topic: "sensor",
+            headers: HashMap::new(),
+            payload: None,
+        };
+        assert_eq!(m.process(&msg1), Some(1.0));
+
+        let msg2 = Message {
+            topic: "sensor",
+            headers: HashMap::new(),
+            payload: None,
+        };
+        assert_eq!(m.process(&msg2), Some(1.0));
+    }
+
+    #[test]
+    fn process_count_with_window() {
+        let sel = compile("/sensor |> window(2s) |> count()").unwrap();
+        let mut m = Matcher::new(sel);
+
+        let msg1 = Message {
+            topic: "sensor",
+            headers: HashMap::new(),
+            payload: None,
+        };
+        assert_eq!(m.process(&msg1), Some(1.0));
+
+        let msg2 = Message {
+            topic: "sensor",
+            headers: HashMap::new(),
+            payload: None,
+        };
+        assert_eq!(m.process(&msg2), Some(2.0));
+
+        let msg3 = Message {
+            topic: "sensor",
+            headers: HashMap::new(),
+            payload: None,
+        };
+        assert_eq!(m.process(&msg3), Some(2.0));
     }
 }
