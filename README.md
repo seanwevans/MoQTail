@@ -45,6 +45,9 @@ $ moqtail sub "//sensor[@type='temp'][json$.value > 30]"
 # Use a different broker address
 $ moqtail sub --host broker.example.com --port 1884 "//sensor"
 
+# Authenticate over TLS
+$ moqtail sub --username alice --password secret --tls "//sensor"
+
 # Only check that the query compiles
 $ moqtail sub --dry-run "//sensor"
 ```
