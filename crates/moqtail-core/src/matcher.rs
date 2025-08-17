@@ -10,7 +10,7 @@ pub struct Message<'a> {
 
 enum StageState {
     Window { size: usize, values: VecDeque<f64> },
-    Counter { size: usize, values: VecDeque<()> },
+    Counter { size: usize, count: usize },
 }
 
 pub struct Matcher {
@@ -36,7 +36,7 @@ impl Matcher {
                 Stage::Count => {
                     stage_states.push(StageState::Counter {
                         size: window_size,
-                        values: VecDeque::new(),
+                        count: 0,
                     });
                 }
             }
@@ -89,13 +89,12 @@ impl Matcher {
                     state_idx += 1;
                 }
                 Stage::Count => {
-                    if let StageState::Counter { size, values } = &mut self.stage_states[state_idx]
-                    {
-                        values.push_back(());
-                        if values.len() > *size {
-                            values.pop_front();
+                    if let StageState::Counter { size, count } = &mut self.stage_states[state_idx] {
+                        *count += 1;
+                        if *count > *size {
+                            *count -= 1;
                         }
-                        result = Some(values.len() as f64);
+                        result = Some(*count as f64);
                     }
                     state_idx += 1;
                 }
