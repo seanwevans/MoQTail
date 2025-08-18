@@ -1,6 +1,6 @@
 use clap::{Parser, Subcommand};
 use moqtail_core::compile;
-use rumqttc::{Client, Event, Incoming, MqttOptions, QoS};
+use rumqttc::{Client, Event, Incoming, MqttOptions, QoS, Transport};
 use std::time::Duration;
 
 #[derive(Parser)]
@@ -25,6 +25,15 @@ enum Commands {
         /// Only compile selector without connecting
         #[arg(long)]
         dry_run: bool,
+        /// Username for authentication
+        #[arg(long)]
+        username: Option<String>,
+        /// Password for authentication
+        #[arg(long)]
+        password: Option<String>,
+        /// Use TLS for the connection
+        #[arg(long)]
+        tls: bool,
     },
 }
 
@@ -37,6 +46,9 @@ fn main() {
             host,
             port,
             dry_run,
+            username,
+            password,
+            tls,
         } => match compile(&query) {
             Ok(selector) => {
                 println!("{selector}");
@@ -46,6 +58,15 @@ fn main() {
 
                 let mut mqttoptions = MqttOptions::new("moqtail-cli", host, port);
                 mqttoptions.set_keep_alive(Duration::from_secs(5));
+                if username.is_some() || password.is_some() {
+                    mqttoptions.set_credentials(
+                        username.unwrap_or_default(),
+                        password.unwrap_or_default(),
+                    );
+                }
+                if tls {
+                    mqttoptions.set_transport(Transport::tls_with_default_config());
+                }
 
                 let (client, mut connection) = Client::new(mqttoptions, 10);
                 if let Err(e) = client.subscribe(selector.to_string(), QoS::AtMostOnce) {

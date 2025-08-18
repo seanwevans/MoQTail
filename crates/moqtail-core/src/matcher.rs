@@ -10,7 +10,7 @@ pub struct Message<'a> {
 
 enum StageState {
     Window { size: usize, values: VecDeque<f64> },
-    Counter { size: usize, values: VecDeque<()> },
+    Counter { size: usize, count: usize },
 }
 
 pub struct Matcher {
@@ -44,7 +44,7 @@ impl Matcher {
                 Stage::Count => {
                     stage_states.push(StageState::Counter {
                         size: window_size,
-                        values: VecDeque::new(),
+                        count: 0,
                     });
                 }
             }
@@ -97,13 +97,12 @@ impl Matcher {
                     state_idx += 1;
                 }
                 Stage::Count => {
-                    if let StageState::Counter { size, values } = &mut self.stage_states[state_idx]
-                    {
-                        values.push_back(());
-                        if values.len() > *size {
-                            values.pop_front();
+                    if let StageState::Counter { size, count } = &mut self.stage_states[state_idx] {
+                        *count += 1;
+                        if *count > *size {
+                            *count -= 1;
                         }
-                        result = Some(values.len() as f64);
+                        result = Some(*count as f64);
                     }
                     state_idx += 1;
                 }
@@ -307,6 +306,7 @@ mod tests {
     }
 
     #[test]
+
     fn predicate_on_json_field() {
         let sel = compile("/foo[json$.temp>30]").unwrap();
         let m = Matcher::new(sel);
@@ -334,5 +334,145 @@ mod tests {
         };
         let field = Field::Json(vec!["temp".into()]);
         assert_eq!(Matcher::extract_field(&field, &msg), Some(21.0));
+
+    fn process_sum_without_window() {
+        let sel = compile("/sensor |> sum(temp)").unwrap();
+        let mut m = Matcher::new(sel);
+
+        let msg1 = Message {
+            topic: "sensor",
+            headers: HashMap::from([(String::from("temp"), String::from("10"))]),
+            payload: None,
+        };
+        assert_eq!(m.process(&msg1), Some(10.0));
+
+        let msg2 = Message {
+            topic: "sensor",
+            headers: HashMap::from([(String::from("temp"), String::from("20"))]),
+            payload: None,
+        };
+        assert_eq!(m.process(&msg2), Some(20.0));
+    }
+
+    #[test]
+    fn process_sum_with_window() {
+        let sel = compile("/sensor |> window(2s) |> sum(temp)").unwrap();
+        let mut m = Matcher::new(sel);
+
+        let msg1 = Message {
+            topic: "sensor",
+            headers: HashMap::from([(String::from("temp"), String::from("10"))]),
+            payload: None,
+        };
+        assert_eq!(m.process(&msg1), Some(10.0));
+
+        let msg2 = Message {
+            topic: "sensor",
+            headers: HashMap::from([(String::from("temp"), String::from("20"))]),
+            payload: None,
+        };
+        assert_eq!(m.process(&msg2), Some(30.0));
+
+        let msg3 = Message {
+            topic: "sensor",
+            headers: HashMap::from([(String::from("temp"), String::from("30"))]),
+            payload: None,
+        };
+        assert_eq!(m.process(&msg3), Some(50.0));
+    }
+
+    #[test]
+    fn process_avg_without_window() {
+        let sel = compile("/sensor |> avg(json$.value)").unwrap();
+        let mut m = Matcher::new(sel);
+
+        let msg1 = Message {
+            topic: "sensor",
+            headers: HashMap::new(),
+            payload: Some(json!({"value": 10})),
+        };
+        assert_eq!(m.process(&msg1), Some(10.0));
+
+        let msg2 = Message {
+            topic: "sensor",
+            headers: HashMap::new(),
+            payload: Some(json!({"value": 20})),
+        };
+        assert_eq!(m.process(&msg2), Some(20.0));
+    }
+
+    #[test]
+    fn process_avg_with_window() {
+        let sel = compile("/sensor |> window(2s) |> avg(json$.value)").unwrap();
+        let mut m = Matcher::new(sel);
+
+        let msg1 = Message {
+            topic: "sensor",
+            headers: HashMap::new(),
+            payload: Some(json!({"value": 10})),
+        };
+        assert_eq!(m.process(&msg1), Some(10.0));
+
+        let msg2 = Message {
+            topic: "sensor",
+            headers: HashMap::new(),
+            payload: Some(json!({"value": 20})),
+        };
+        assert_eq!(m.process(&msg2), Some(15.0));
+
+        let msg3 = Message {
+            topic: "sensor",
+            headers: HashMap::new(),
+            payload: Some(json!({"value": 30})),
+        };
+        assert_eq!(m.process(&msg3), Some(25.0));
+    }
+
+    #[test]
+    fn process_count_without_window() {
+        let sel = compile("/sensor |> count()").unwrap();
+        let mut m = Matcher::new(sel);
+
+        let msg1 = Message {
+            topic: "sensor",
+            headers: HashMap::new(),
+            payload: None,
+        };
+        assert_eq!(m.process(&msg1), Some(1.0));
+
+        let msg2 = Message {
+            topic: "sensor",
+            headers: HashMap::new(),
+            payload: None,
+        };
+        assert_eq!(m.process(&msg2), Some(1.0));
+    }
+
+    #[test]
+    fn process_count_with_window() {
+        let sel = compile("/sensor |> window(2s) |> count()").unwrap();
+        let mut m = Matcher::new(sel);
+
+        let msg1 = Message {
+            topic: "sensor",
+            headers: HashMap::new(),
+            payload: None,
+        };
+        assert_eq!(m.process(&msg1), Some(1.0));
+
+        let msg2 = Message {
+            topic: "sensor",
+            headers: HashMap::new(),
+            payload: None,
+        };
+        assert_eq!(m.process(&msg2), Some(2.0));
+
+        let msg3 = Message {
+            topic: "sensor",
+            headers: HashMap::new(),
+            payload: None,
+        };
+        assert_eq!(m.process(&msg3), Some(2.0));
+
     }
 }
