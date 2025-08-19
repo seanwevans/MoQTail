@@ -334,6 +334,7 @@ mod tests {
         };
         let field = Field::Json(vec!["temp".into()]);
         assert_eq!(Matcher::extract_field(&field, &msg), Some(21.0));
+    }
 
     fn process_sum_without_window() {
         let sel = compile("/sensor |> sum(temp)").unwrap();
@@ -473,6 +474,5 @@ mod tests {
             payload: None,
         };
         assert_eq!(m.process(&msg3), Some(2.0));
-
     }
 }

@@ -7,7 +7,12 @@
 
 use moqtail_core::{compile, Matcher, Message};
 use serde_json::Value as JsonValue;
-use std::{collections::HashMap, ffi::CStr, os::raw::{c_char, c_int, c_void}, slice};
+use std::{
+    collections::HashMap,
+    ffi::CStr,
+    os::raw::{c_char, c_int, c_void},
+    slice,
+};
 
 // Bindings generated in build.rs
 include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
@@ -17,7 +22,6 @@ const MOSQ_ERR_SUCCESS: c_int = 0;
 const MOSQ_ERR_PLUGIN_DEFER: c_int = 17;
 
 // Use generated types `mosquitto_evt_message` and `mosquitto_opt`
-
 
 pub struct PluginContext {
     matchers: Vec<Matcher>,
@@ -44,14 +48,18 @@ extern "C" fn on_message(_: c_int, event_data: *mut c_void, userdata: *mut c_voi
                 Ok(j) => Some(j),
                 Err(e) => {
                     eprintln!("[MoQTail] payload JSON parse error: {}", e);
-                    return MOSQ_ERR_PLUGIN_DEFER;
+                    None
                 }
             }
         } else {
             None
         };
 
-        let m = Message { topic, headers, payload };
+        let m = Message {
+            topic,
+            headers,
+            payload,
+        };
         for matcher in &ctx.matchers {
             if matcher.matches(&m) {
                 return MOSQ_ERR_SUCCESS;
@@ -109,7 +117,12 @@ pub unsafe extern "C" fn mosquitto_plugin_cleanup(
     _options: *mut mosquitto_opt,
     _option_count: c_int,
 ) -> c_int {
-    let _ = mosquitto_callback_unregister(identifier as *mut mosquitto_plugin_id_t, MOSQ_EVT_MESSAGE, Some(on_message), std::ptr::null());
+    let _ = mosquitto_callback_unregister(
+        identifier as *mut mosquitto_plugin_id_t,
+        MOSQ_EVT_MESSAGE,
+        Some(on_message),
+        std::ptr::null(),
+    );
     if !userdata.is_null() {
         drop(Box::from_raw(userdata as *mut PluginContext));
     }
@@ -122,7 +135,10 @@ mod tests {
     use std::ffi::CString;
 
     #[no_mangle]
-    pub static mut REGISTERED: Option<(extern "C" fn(c_int, *mut c_void, *mut c_void) -> c_int, *mut c_void)> = None;
+    pub static mut REGISTERED: Option<(
+        extern "C" fn(c_int, *mut c_void, *mut c_void) -> c_int,
+        *mut c_void,
+    )> = None;
 
     #[no_mangle]
     unsafe extern "C" fn mosquitto_callback_register(
@@ -153,33 +169,56 @@ mod tests {
     fn filter_logic() {
         unsafe {
             let key = CString::new("selector").unwrap();
-            let val = CString::new("/foo/+" ).unwrap();
-            let mut opt = mosquitto_opt { key: key.as_ptr() as *mut c_char, value: val.as_ptr() as *mut c_char };
+            let val = CString::new("/foo/+[json$.temp=1]").unwrap();
+            let mut opt = mosquitto_opt {
+                key: key.as_ptr() as *mut c_char,
+                value: val.as_ptr() as *mut c_char,
+            };
             let mut userdata: *mut c_void = std::ptr::null_mut();
 
-            assert_eq!(mosquitto_plugin_init(std::ptr::null_mut(), &mut userdata, &mut opt, 1), MOSQ_ERR_SUCCESS);
+            assert_eq!(
+                mosquitto_plugin_init(std::ptr::null_mut(), &mut userdata, &mut opt, 1),
+                MOSQ_ERR_SUCCESS
+            );
             let (cb, ctx) = REGISTERED.expect("callback registered");
 
             let topic1 = CString::new("foo/bar").unwrap();
+            let payload1 = CString::new("{\"temp\":1}").unwrap();
             let mut msg = mosquitto_evt_message {
                 future: std::ptr::null_mut(),
                 client: std::ptr::null_mut(),
                 topic: topic1.as_ptr() as *mut c_char,
-                payload: std::ptr::null_mut(),
+                payload: payload1.as_ptr() as *mut c_void,
                 properties: std::ptr::null_mut(),
                 reason_string: std::ptr::null_mut(),
-                payloadlen: 0,
+                payloadlen: payload1.as_bytes().len() as u32,
                 qos: 0,
                 reason_code: 0,
                 retain: false,
                 future2: [std::ptr::null_mut(); 4],
             };
 
-            assert_eq!(cb(MOSQ_EVT_MESSAGE, &mut msg as *mut _ as *mut c_void, ctx), MOSQ_ERR_SUCCESS);
+            assert_eq!(
+                cb(MOSQ_EVT_MESSAGE, &mut msg as *mut _ as *mut c_void, ctx),
+                MOSQ_ERR_SUCCESS
+            );
 
             let topic2 = CString::new("baz/qux").unwrap();
             msg.topic = topic2.as_ptr() as *mut c_char;
-            assert_eq!(cb(MOSQ_EVT_MESSAGE, &mut msg as *mut _ as *mut c_void, ctx), MOSQ_ERR_PLUGIN_DEFER);
+            assert_eq!(
+                cb(MOSQ_EVT_MESSAGE, &mut msg as *mut _ as *mut c_void, ctx),
+                MOSQ_ERR_PLUGIN_DEFER
+            );
+
+            let topic3 = CString::new("foo/baz").unwrap();
+            let bad_payload = CString::new("{temp:}").unwrap();
+            msg.topic = topic3.as_ptr() as *mut c_char;
+            msg.payload = bad_payload.as_ptr() as *mut c_void;
+            msg.payloadlen = bad_payload.as_bytes().len() as u32;
+            assert_eq!(
+                cb(MOSQ_EVT_MESSAGE, &mut msg as *mut _ as *mut c_void, ctx),
+                MOSQ_ERR_PLUGIN_DEFER
+            );
 
             mosquitto_plugin_cleanup(std::ptr::null_mut(), userdata, std::ptr::null_mut(), 0);
             assert!(REGISTERED.is_none());
