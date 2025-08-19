@@ -24,7 +24,7 @@ number = { "-"? ~ ASCII_DIGIT+ ~ ("." ~ ASCII_DIGIT+)? }
 
 boolean = { "true" | "false" }
 
-string = { "\"" ~ (!"\"" ~ ANY)* ~ "\"" }
+string = { "\"" ~ ( "\\" ~ ANY | !"\"" ~ ANY )* ~ "\"" }
 
 value = { boolean | number | string }
 
