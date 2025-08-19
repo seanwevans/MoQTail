@@ -119,7 +119,9 @@ pub fn compile(input: &str) -> Result<Selector, Error> {
                         Rule::boolean => Value::Bool(value_inner.as_str() == "true"),
                         Rule::string => {
                             let s = value_inner.as_str();
-                            Value::Str(s[1..s.len() - 1].to_string())
+                            let parsed: String =
+                                serde_json::from_str(s).map_err(|_| Error::InvalidValue)?;
+                            Value::Str(parsed)
                         }
                         _ => return Err(Error::InvalidValue),
                     };
