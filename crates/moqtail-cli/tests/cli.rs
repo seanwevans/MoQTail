@@ -37,3 +37,22 @@ fn sub_accepts_auth_and_tls_flags() {
         .arg("--dry-run");
     cmd.assert().success().stdout(contains("/foo"));
 }
+
+#[test]
+fn sub_accepts_single_credential_flags() {
+    let mut cmd = Command::cargo_bin("moqtail-cli").unwrap();
+    cmd.arg("sub")
+        .arg("/foo")
+        .arg("--username")
+        .arg("user")
+        .arg("--dry-run");
+    cmd.assert().success().stdout(contains("/foo"));
+
+    let mut cmd = Command::cargo_bin("moqtail-cli").unwrap();
+    cmd.arg("sub")
+        .arg("/foo")
+        .arg("--password")
+        .arg("pass")
+        .arg("--dry-run");
+    cmd.assert().success().stdout(contains("/foo"));
+}
