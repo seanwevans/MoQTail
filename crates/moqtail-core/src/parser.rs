@@ -100,7 +100,7 @@ pub fn compile(input: &str) -> Result<Selector, Error> {
                     let mut pred_inner = pred_pair.into_inner();
                     let field_pair = pred_inner.next().ok_or(Error::MissingField)?;
                     let inner_field = field_pair.into_inner().next().ok_or(Error::MissingField)?;
-                    let field = parse_field(inner_field);
+                    let field = parse_field(inner_field)?;
 
                     let op_pair = pred_inner.next().ok_or(Error::MissingOperator)?;
                     let op = match op_pair.as_str() {
@@ -143,9 +143,9 @@ pub fn compile(input: &str) -> Result<Selector, Error> {
     Ok(Selector { steps, stages })
 }
 
-fn parse_field(inner_field: pest::iterators::Pair<Rule>) -> Field {
+fn parse_field(inner_field: pest::iterators::Pair<Rule>) -> Result<Field, Error> {
     match inner_field.as_rule() {
-        Rule::ident => Field::Header(inner_field.as_str().to_string()),
+        Rule::ident => Ok(Field::Header(inner_field.as_str().to_string())),
         Rule::json_field => {
             let text = inner_field.as_str();
             let without = match text.strip_prefix("json$") {
@@ -160,7 +160,11 @@ fn parse_field(inner_field: pest::iterators::Pair<Rule>) -> Field {
                 .filter(|p| !p.is_empty())
                 .map(|p| p.to_string())
                 .collect();
-            Field::Json(parts)
+            if parts.is_empty() {
+                Err(Error::MissingField)
+            } else {
+                Ok(Field::Json(parts))
+            }
         }
         _ => unreachable!(),
     }
@@ -186,12 +190,12 @@ fn parse_stage(pair: pest::iterators::Pair<Rule>) -> Result<Stage, Error> {
         "sum" => {
             let a = arg.ok_or(Error::SumRequiresField)?;
             let field_inner = a.into_inner().next().ok_or(Error::SumRequiresField)?;
-            Ok(Stage::Sum(parse_field(field_inner)))
+            Ok(Stage::Sum(parse_field(field_inner)?))
         }
         "avg" => {
             let a = arg.ok_or(Error::AvgRequiresField)?;
             let field_inner = a.into_inner().next().ok_or(Error::AvgRequiresField)?;
-            Ok(Stage::Avg(parse_field(field_inner)))
+            Ok(Stage::Avg(parse_field(field_inner)?))
         }
         "count" => Ok(Stage::Count),
         _ => Err(Error::UnknownFunction(name.to_string())),
