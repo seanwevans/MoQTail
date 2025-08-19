@@ -129,6 +129,6 @@ fn display_value(val: &Value) -> String {
     match val {
         Value::Number(n) => n.to_string(),
         Value::Bool(b) => b.to_string(),
-        Value::Str(s) => format!("\"{}\"", s),
+        Value::Str(s) => serde_json::to_string(s).unwrap(),
     }
 }

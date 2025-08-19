@@ -49,7 +49,7 @@ extern "C" fn on_message(_: c_int, event_data: *mut c_void, userdata: *mut c_voi
                 Ok(j) => Some(j),
                 Err(e) => {
                     eprintln!("[MoQTail] payload JSON parse error: {}", e);
-                    return MOSQ_ERR_PLUGIN_DEFER;
+                    None
                 }
             }
         } else {
@@ -184,14 +184,15 @@ mod tests {
             let (cb, ctx) = REGISTERED.expect("callback registered");
 
             let topic1 = CString::new("foo/bar").unwrap();
+            let payload1 = CString::new("{\"temp\":1}").unwrap();
             let mut msg = mosquitto_evt_message {
                 future: std::ptr::null_mut(),
                 client: std::ptr::null_mut(),
                 topic: topic1.as_ptr() as *mut c_char,
-                payload: std::ptr::null_mut(),
+                payload: payload1.as_ptr() as *mut c_void,
                 properties: std::ptr::null_mut(),
                 reason_string: std::ptr::null_mut(),
-                payloadlen: 0,
+                payloadlen: payload1.as_bytes().len() as u32,
                 qos: 0,
                 reason_code: 0,
                 retain: false,
@@ -205,6 +206,16 @@ mod tests {
 
             let topic2 = CString::new("baz/qux").unwrap();
             msg.topic = topic2.as_ptr() as *mut c_char;
+            assert_eq!(
+                cb(MOSQ_EVT_MESSAGE, &mut msg as *mut _ as *mut c_void, ctx),
+                MOSQ_ERR_PLUGIN_DEFER
+            );
+
+            let topic3 = CString::new("foo/baz").unwrap();
+            let bad_payload = CString::new("{temp:}").unwrap();
+            msg.topic = topic3.as_ptr() as *mut c_char;
+            msg.payload = bad_payload.as_ptr() as *mut c_void;
+            msg.payloadlen = bad_payload.as_bytes().len() as u32;
             assert_eq!(
                 cb(MOSQ_EVT_MESSAGE, &mut msg as *mut _ as *mut c_void, ctx),
                 MOSQ_ERR_PLUGIN_DEFER

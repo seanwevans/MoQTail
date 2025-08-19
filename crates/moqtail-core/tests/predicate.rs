@@ -53,3 +53,8 @@ fn json_predicate_fractional() {
     let m = Matcher::new(sel);
     assert!(m.matches(&msg));
 }
+
+#[test]
+fn json_predicate_missing_field() {
+    assert!(compile(" /foo[json$>1]").is_err());
+}
