@@ -58,11 +58,11 @@ fn main() {
 
                 let mut mqttoptions = MqttOptions::new("moqtail-cli", host, port);
                 mqttoptions.set_keep_alive(Duration::from_secs(5));
-                if username.is_some() || password.is_some() {
-                    mqttoptions.set_credentials(
-                        username.unwrap_or_default(),
-                        password.unwrap_or_default(),
-                    );
+                match (username, password) {
+                    (Some(u), Some(p)) => mqttoptions.set_credentials(u, p),
+                    (Some(u), None) => mqttoptions.set_credentials(u, ""),
+                    (None, Some(p)) => mqttoptions.set_credentials("", p),
+                    (None, None) => {}
                 }
                 if tls {
                     mqttoptions.set_transport(Transport::tls_with_default_config());
