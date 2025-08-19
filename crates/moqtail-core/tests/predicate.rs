@@ -1,5 +1,6 @@
 use moqtail_core::{compile, Matcher, Message};
 use serde_json::json;
+use std::borrow::Cow;
 use std::collections::HashMap;
 
 #[test]
@@ -7,7 +8,7 @@ fn header_predicate_match() {
     let sel = compile("/msg[qos<=1]").unwrap();
     let msg = Message {
         topic: "",
-        headers: HashMap::from([("qos".to_string(), "0".to_string())]),
+        headers: HashMap::from([(Cow::Borrowed("qos"), Cow::Borrowed("0"))]),
         payload: None,
     };
     let m = Matcher::new(sel);
@@ -33,7 +34,7 @@ fn header_predicate_negative_fractional() {
     let sel = compile("/msg[temp<=-1.5]").unwrap();
     let msg = Message {
         topic: "",
-        headers: HashMap::from([("temp".to_string(), "-1.5".to_string())]),
+        headers: HashMap::from([(Cow::Borrowed("temp"), Cow::Borrowed("-1.5"))]),
         payload: None,
     };
     let m = Matcher::new(sel);

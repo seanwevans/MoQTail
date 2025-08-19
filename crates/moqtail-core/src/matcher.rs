@@ -1,10 +1,11 @@
 use crate::ast::{Axis, Field, Operator, Predicate, Segment, Selector, Stage, Step, Value};
 use serde_json::Value as JsonValue;
+use std::borrow::Cow;
 use std::collections::{HashMap, VecDeque};
 
 pub struct Message<'a> {
     pub topic: &'a str,
-    pub headers: HashMap<String, String>,
+    pub headers: HashMap<Cow<'a, str>, Cow<'a, str>>,
     pub payload: Option<JsonValue>,
 }
 
@@ -185,8 +186,8 @@ impl Matcher {
     fn predicate_match(pred: &Predicate, msg: &Message) -> bool {
         let left = match pred.field {
             Field::Header(ref name) => {
-                let hv = match msg.headers.get(name) {
-                    Some(v) => v,
+                let hv = match msg.headers.get(name.as_str()) {
+                    Some(v) => v.as_ref(),
                     None => return false,
                 };
                 if let Ok(num) = hv.parse::<f64>() {
@@ -194,7 +195,7 @@ impl Matcher {
                 } else if hv == "true" || hv == "false" {
                     Value::Bool(hv == "true")
                 } else {
-                    Value::Str(hv.clone())
+                    Value::Str(hv.to_string())
                 }
             }
             Field::Json(ref path) => {
@@ -244,7 +245,7 @@ impl Matcher {
 
     fn extract_field(field: &Field, msg: &Message) -> Option<f64> {
         match field {
-            Field::Header(name) => msg.headers.get(name)?.parse::<f64>().ok(),
+            Field::Header(name) => msg.headers.get(name.as_str())?.as_ref().parse::<f64>().ok(),
             Field::Json(path) => {
                 let v = json_path(msg.payload.as_ref()?, path)?;
                 if let Some(f) = v.as_f64() {
@@ -262,6 +263,7 @@ mod tests {
     use super::*;
     use crate::parser::compile;
     use serde_json::json;
+    use std::borrow::Cow;
     use std::collections::HashMap;
 
     fn make_msg(topic: &str) -> Message<'_> {
@@ -334,21 +336,23 @@ mod tests {
         };
         let field = Field::Json(vec!["temp".into()]);
         assert_eq!(Matcher::extract_field(&field, &msg), Some(21.0));
+    }
 
+    #[test]
     fn process_sum_without_window() {
         let sel = compile("/sensor |> sum(temp)").unwrap();
         let mut m = Matcher::new(sel);
 
         let msg1 = Message {
             topic: "sensor",
-            headers: HashMap::from([(String::from("temp"), String::from("10"))]),
+            headers: HashMap::from([(Cow::Borrowed("temp"), Cow::Borrowed("10"))]),
             payload: None,
         };
         assert_eq!(m.process(&msg1), Some(10.0));
 
         let msg2 = Message {
             topic: "sensor",
-            headers: HashMap::from([(String::from("temp"), String::from("20"))]),
+            headers: HashMap::from([(Cow::Borrowed("temp"), Cow::Borrowed("20"))]),
             payload: None,
         };
         assert_eq!(m.process(&msg2), Some(20.0));
@@ -361,21 +365,21 @@ mod tests {
 
         let msg1 = Message {
             topic: "sensor",
-            headers: HashMap::from([(String::from("temp"), String::from("10"))]),
+            headers: HashMap::from([(Cow::Borrowed("temp"), Cow::Borrowed("10"))]),
             payload: None,
         };
         assert_eq!(m.process(&msg1), Some(10.0));
 
         let msg2 = Message {
             topic: "sensor",
-            headers: HashMap::from([(String::from("temp"), String::from("20"))]),
+            headers: HashMap::from([(Cow::Borrowed("temp"), Cow::Borrowed("20"))]),
             payload: None,
         };
         assert_eq!(m.process(&msg2), Some(30.0));
 
         let msg3 = Message {
             topic: "sensor",
-            headers: HashMap::from([(String::from("temp"), String::from("30"))]),
+            headers: HashMap::from([(Cow::Borrowed("temp"), Cow::Borrowed("30"))]),
             payload: None,
         };
         assert_eq!(m.process(&msg3), Some(50.0));
@@ -473,6 +477,5 @@ mod tests {
             payload: None,
         };
         assert_eq!(m.process(&msg3), Some(2.0));
-
     }
 }
