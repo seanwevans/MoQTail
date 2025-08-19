@@ -225,11 +225,11 @@ impl Matcher {
     fn compare_values(left: &Value, right: &Value, op: Operator) -> bool {
         match (left, right) {
             (Value::Number(l), Value::Number(r)) => match op {
-                Operator::Eq => l == r,
-                Operator::Lt => l < r,
-                Operator::Gt => l > r,
-                Operator::Le => l <= r,
-                Operator::Ge => l >= r,
+                Operator::Eq => (l - r).abs() < f64::EPSILON,
+                Operator::Lt => l < r && (r - l) > f64::EPSILON,
+                Operator::Gt => l > r && (l - r) > f64::EPSILON,
+                Operator::Le => l < r || (l - r).abs() < f64::EPSILON,
+                Operator::Ge => l > r || (l - r).abs() < f64::EPSILON,
             },
             (Value::Bool(l), Value::Bool(r)) => match op {
                 Operator::Eq => l == r,
@@ -308,7 +308,20 @@ mod tests {
     }
 
     #[test]
+    fn numbers_within_epsilon_are_equal() {
+        let l = Value::Number(1.0);
+        let r = Value::Number(1.0 + f64::EPSILON / 2.0);
+        assert!(Matcher::compare_values(&l, &r, Operator::Eq));
+    }
 
+    #[test]
+    fn numbers_outside_epsilon_are_not_equal() {
+        let l = Value::Number(1.0);
+        let r = Value::Number(1.0 + f64::EPSILON * 2.0);
+        assert!(!Matcher::compare_values(&l, &r, Operator::Eq));
+    }
+
+    #[test]
     fn predicate_on_json_field() {
         let sel = compile("/foo[json$.temp>30]").unwrap();
         let m = Matcher::new(sel);
