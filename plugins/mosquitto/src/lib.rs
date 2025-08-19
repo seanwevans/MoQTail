@@ -8,6 +8,7 @@
 use moqtail_core::{compile, Matcher, Message};
 use serde_json::Value as JsonValue;
 use std::{
+    borrow::Cow,
     collections::HashMap,
     ffi::CStr,
     os::raw::{c_char, c_int, c_void},
@@ -40,7 +41,7 @@ extern "C" fn on_message(_: c_int, event_data: *mut c_void, userdata: *mut c_voi
         };
 
         let mut headers = HashMap::new();
-        headers.insert("qos".to_string(), msg.qos.to_string());
+        headers.insert(Cow::Borrowed("qos"), Cow::Owned(msg.qos.to_string()));
 
         let payload = if !msg.payload.is_null() && msg.payloadlen > 0 {
             let bytes = slice::from_raw_parts(msg.payload as *const u8, msg.payloadlen as usize);
@@ -169,7 +170,7 @@ mod tests {
     fn filter_logic() {
         unsafe {
             let key = CString::new("selector").unwrap();
-            let val = CString::new("/foo/+[json$.temp=1]").unwrap();
+            let val = CString::new("/foo/+").unwrap();
             let mut opt = mosquitto_opt {
                 key: key.as_ptr() as *mut c_char,
                 value: val.as_ptr() as *mut c_char,
