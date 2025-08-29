@@ -24,6 +24,7 @@ fn sub_errors_on_connection_failure() {
     cmd.assert().failure().stderr(contains("Connection error"));
 }
 
+#[cfg(feature = "tls")]
 #[test]
 fn sub_accepts_auth_and_tls_flags() {
     let mut cmd = Command::cargo_bin("moqtail-cli").unwrap();
