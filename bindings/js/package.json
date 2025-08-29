@@ -5,5 +5,8 @@
   "files": ["index.js", "moqtail-js.node"],
   "scripts": {
     "install": "napi build --release"
+  },
+  "devDependencies": {
+    "@napi-rs/cli": "^2"
   }
 }
