@@ -62,7 +62,7 @@ fn count_pipeline() {
 
     let msg2 = Message {
         topic: "sensor",
-        headers: headers,
+        headers,
         payload: None,
     };
     assert_eq!(m.process(&msg2), Some(2.0));

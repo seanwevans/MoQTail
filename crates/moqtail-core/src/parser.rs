@@ -7,7 +7,7 @@ use thiserror::Error;
 #[derive(Debug, Error)]
 pub enum Error {
     #[error(transparent)]
-    Pest(#[from] pest::error::Error<Rule>),
+    Pest(#[from] Box<pest::error::Error<Rule>>),
     #[error(transparent)]
     ParseInt(#[from] std::num::ParseIntError),
     #[error(transparent)]
@@ -46,6 +46,12 @@ pub enum Error {
     AvgRequiresField,
     #[error("unknown function {0}")]
     UnknownFunction(String),
+}
+
+impl From<pest::error::Error<Rule>> for Error {
+    fn from(err: pest::error::Error<Rule>) -> Self {
+        Error::Pest(Box::new(err))
+    }
 }
 
 #[derive(Parser)]
@@ -150,13 +156,8 @@ fn parse_field(inner_field: pest::iterators::Pair<Rule>) -> Result<Field, Error>
         Rule::ident => Ok(Field::Header(inner_field.as_str().to_string())),
         Rule::json_field => {
             let text = inner_field.as_str();
-            let without = match text.strip_prefix("json$") {
-                Some(rest) => rest,
-                None => {
-                    // this should be unreachable as the grammar guarantees the prefix
-                    ""
-                }
-            };
+            // The grammar guarantees the prefix, so this unwrap is safe.
+            let without = text.strip_prefix("json$").unwrap_or_default();
             let parts: Vec<String> = without
                 .split('.')
                 .filter(|p| !p.is_empty())
