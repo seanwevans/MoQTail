@@ -35,6 +35,7 @@ This guide explains the project layout, coding standards, and pull‑request wor
 
 * **Rust** 1.78+ (install via [`rustup`](https://rustup.rs)).
 * **Node.js** 20+ (only if you hack on the JS bindings).
+* [`@napi-rs/cli`](https://github.com/Brooooooklyn/napi-rs/tree/main/cli) (required for building the JS bindings).
 * **Python** 3.12+ with development headers (only for the optional Python bindings).
 * **GNU Make** (used by `Makefile` shortcuts).
 * **Docker** (optional, for broker plugin testing).
