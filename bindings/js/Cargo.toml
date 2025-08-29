@@ -6,8 +6,13 @@ license = "MIT OR Apache-2.0"
 
 [lib]
 crate-type = ["cdylib"]
+required-features = ["js-bindings"]
 
 [dependencies]
 moqtail-core = { path = "../../crates/moqtail-core" }
 napi = { version = "2", features = ["napi6"] }
 napi-derive = "2"
+
+[features]
+default = []
+js-bindings = []
