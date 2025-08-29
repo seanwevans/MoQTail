@@ -49,7 +49,7 @@ extern "C" fn on_message(_: c_int, event_data: *mut c_void, userdata: *mut c_voi
                 Ok(j) => Some(j),
                 Err(e) => {
                     eprintln!("[MoQTail] payload JSON parse error: {}", e);
-                    return MOSQ_ERR_PLUGIN_DEFER;
+                    None
                 }
             }
         } else {
@@ -219,7 +219,7 @@ mod tests {
             msg.payloadlen = bad_payload.as_bytes().len() as u32;
             assert_eq!(
                 cb(MOSQ_EVT_MESSAGE, &mut msg as *mut _ as *mut c_void, ctx),
-                MOSQ_ERR_PLUGIN_DEFER
+                MOSQ_ERR_SUCCESS
             );
 
             mosquitto_plugin_cleanup(std::ptr::null_mut(), userdata, std::ptr::null_mut(), 0);
