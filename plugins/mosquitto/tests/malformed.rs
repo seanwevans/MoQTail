@@ -5,6 +5,8 @@ use moqtail_mosquitto::{
     mosquitto_evt_message, mosquitto_opt, mosquitto_plugin_cleanup, mosquitto_plugin_init,
 };
 
+const MOSQ_ERR_PLUGIN_DEFER: c_int = 17;
+
 static mut REGISTERED: Option<(
     extern "C" fn(c_int, *mut c_void, *mut c_void) -> c_int,
     *mut c_void,
@@ -68,7 +70,7 @@ fn malformed_json() {
             future2: [std::ptr::null_mut(); 4],
         };
 
-        assert_eq!(cb(7, &mut msg as *mut _ as *mut c_void, ctx), 1);
+        assert_eq!(cb(7, &mut msg as *mut _ as *mut c_void, ctx), MOSQ_ERR_PLUGIN_DEFER);
 
         mosquitto_plugin_cleanup(std::ptr::null_mut(), userdata, std::ptr::null_mut(), 0);
         assert!(REGISTERED.is_none());

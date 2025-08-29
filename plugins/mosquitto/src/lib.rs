@@ -11,7 +11,7 @@ use std::{
     borrow::Cow,
     collections::HashMap,
     ffi::CStr,
-    os::raw::{c_char, c_int, c_void},
+    os::raw::{c_int, c_void},
     slice,
 };
 
@@ -49,7 +49,7 @@ extern "C" fn on_message(_: c_int, event_data: *mut c_void, userdata: *mut c_voi
                 Ok(j) => Some(j),
                 Err(e) => {
                     eprintln!("[MoQTail] payload JSON parse error: {}", e);
-                    None
+                    return MOSQ_ERR_PLUGIN_DEFER;
                 }
             }
         } else {
@@ -134,6 +134,7 @@ pub unsafe extern "C" fn mosquitto_plugin_cleanup(
 mod tests {
     use super::*;
     use std::ffi::CString;
+    use std::os::raw::c_char;
 
     #[no_mangle]
     pub static mut REGISTERED: Option<(

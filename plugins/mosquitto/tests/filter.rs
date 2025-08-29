@@ -3,6 +3,8 @@ use std::os::raw::{c_char, c_int, c_void};
 extern crate moqtail_mosquitto;
 use moqtail_mosquitto::{mosquitto_opt, mosquitto_evt_message, mosquitto_plugin_init, mosquitto_plugin_cleanup};
 
+const MOSQ_ERR_PLUGIN_DEFER: c_int = 17;
+
 
 static mut REGISTERED: Option<(extern "C" fn(c_int, *mut c_void, *mut c_void) -> c_int, *mut c_void)> = None;
 
@@ -62,7 +64,7 @@ fn filter_integration() {
 
         let topic2 = CString::new("baz/qux").unwrap();
         msg.topic = topic2.as_ptr() as *mut c_char;
-        assert_eq!(cb(7, &mut msg as *mut _ as *mut c_void, ctx), 1);
+        assert_eq!(cb(7, &mut msg as *mut _ as *mut c_void, ctx), MOSQ_ERR_PLUGIN_DEFER);
 
         mosquitto_plugin_cleanup(std::ptr::null_mut(), userdata, std::ptr::null_mut(), 0);
         assert!(REGISTERED.is_none());
@@ -98,7 +100,7 @@ fn header_filter() {
         assert_eq!(cb(7, &mut msg as *mut _ as *mut c_void, ctx), 0);
 
         msg.qos = 2;
-        assert_eq!(cb(7, &mut msg as *mut _ as *mut c_void, ctx), 1);
+        assert_eq!(cb(7, &mut msg as *mut _ as *mut c_void, ctx), MOSQ_ERR_PLUGIN_DEFER);
 
         mosquitto_plugin_cleanup(std::ptr::null_mut(), userdata, std::ptr::null_mut(), 0);
         assert!(REGISTERED.is_none());
@@ -137,7 +139,7 @@ fn payload_filter() {
         let payload2 = CString::new("{\"temp\":25}").unwrap();
         msg.payload = payload2.as_ptr() as *mut c_void;
         msg.payloadlen = payload2.as_bytes().len() as u32;
-        assert_eq!(cb(7, &mut msg as *mut _ as *mut c_void, ctx), 1);
+        assert_eq!(cb(7, &mut msg as *mut _ as *mut c_void, ctx), MOSQ_ERR_PLUGIN_DEFER);
 
         mosquitto_plugin_cleanup(std::ptr::null_mut(), userdata, std::ptr::null_mut(), 0);
         assert!(REGISTERED.is_none());
