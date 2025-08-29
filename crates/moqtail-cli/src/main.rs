@@ -1,6 +1,8 @@
 use clap::{Parser, Subcommand};
 use moqtail_core::compile;
-use rumqttc::{Client, Event, Incoming, MqttOptions, QoS, Transport};
+#[cfg(feature = "tls")]
+use rumqttc::Transport;
+use rumqttc::{Client, Event, Incoming, MqttOptions, QoS};
 use std::time::Duration;
 
 #[derive(Parser)]
@@ -32,6 +34,7 @@ enum Commands {
         #[arg(long)]
         password: Option<String>,
         /// Use TLS for the connection
+        #[cfg(feature = "tls")]
         #[arg(long)]
         tls: bool,
     },
@@ -48,6 +51,7 @@ fn main() {
             dry_run,
             username,
             password,
+            #[cfg(feature = "tls")]
             tls,
         } => match compile(&query) {
             Ok(selector) => {
@@ -59,11 +63,18 @@ fn main() {
                 let mut mqttoptions = MqttOptions::new("moqtail-cli", host, port);
                 mqttoptions.set_keep_alive(Duration::from_secs(5));
                 match (username, password) {
-                    (Some(u), Some(p)) => mqttoptions.set_credentials(u, p),
-                    (Some(u), None) => mqttoptions.set_credentials(u, ""),
-                    (None, Some(p)) => mqttoptions.set_credentials("", p),
+                    (Some(u), Some(p)) => {
+                        mqttoptions.set_credentials(u, p);
+                    }
+                    (Some(u), None) => {
+                        mqttoptions.set_credentials(u, "");
+                    }
+                    (None, Some(p)) => {
+                        mqttoptions.set_credentials("", p);
+                    }
                     (None, None) => {}
                 }
+                #[cfg(feature = "tls")]
                 if tls {
                     mqttoptions.set_transport(Transport::tls_with_default_config());
                 }

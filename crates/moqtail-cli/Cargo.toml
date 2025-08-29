@@ -4,9 +4,13 @@ version = "0.1.0"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 
+[features]
+default = ["tls"]
+tls = ["rumqttc/use-rustls"]
+
 [dependencies]
 moqtail-core = { path = "../moqtail-core" }
-rumqttc = "0.24"
+rumqttc = { version = "0.24", default-features = false }
 
 [dependencies.clap]
 version = "4"
