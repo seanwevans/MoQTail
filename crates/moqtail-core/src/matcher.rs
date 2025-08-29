@@ -1,7 +1,10 @@
 use crate::ast::{Axis, Field, Operator, Predicate, Segment, Selector, Stage, Step, Value};
 use serde_json::Value as JsonValue;
 use std::borrow::Cow;
+use std::cmp::Ordering;
 use std::collections::{HashMap, VecDeque};
+
+const FLOAT_TOLERANCE: f64 = f64::EPSILON;
 
 pub struct Message<'a> {
     pub topic: &'a str,
@@ -222,15 +225,35 @@ impl Matcher {
         Self::compare_values(&left, &pred.value, pred.op)
     }
 
+    fn compare_numbers(l: f64, r: f64, op: Operator) -> bool {
+        if l.is_nan() || r.is_nan() {
+            return false;
+        }
+
+        if l.is_infinite() || r.is_infinite() {
+            return match op {
+                Operator::Eq => l == r,
+                Operator::Lt => l < r,
+                Operator::Gt => l > r,
+                Operator::Le => l <= r,
+                Operator::Ge => l >= r,
+            };
+        }
+
+        let eq = float_cmp::approx_eq!(f64, l, r, epsilon = FLOAT_TOLERANCE);
+        let ord = l.total_cmp(&r);
+        match op {
+            Operator::Eq => eq,
+            Operator::Lt => ord == Ordering::Less && !eq,
+            Operator::Gt => ord == Ordering::Greater && !eq,
+            Operator::Le => ord != Ordering::Greater || eq,
+            Operator::Ge => ord != Ordering::Less || eq,
+        }
+    }
+
     fn compare_values(left: &Value, right: &Value, op: Operator) -> bool {
         match (left, right) {
-            (Value::Number(l), Value::Number(r)) => match op {
-                Operator::Eq => (l - r).abs() < f64::EPSILON,
-                Operator::Lt => l < r && (r - l) > f64::EPSILON,
-                Operator::Gt => l > r && (l - r) > f64::EPSILON,
-                Operator::Le => l < r || (l - r).abs() < f64::EPSILON,
-                Operator::Ge => l > r || (l - r).abs() < f64::EPSILON,
-            },
+            (Value::Number(l), Value::Number(r)) => Self::compare_numbers(*l, *r, op),
             (Value::Bool(l), Value::Bool(r)) => match op {
                 Operator::Eq => l == r,
                 _ => false,
@@ -310,15 +333,53 @@ mod tests {
     #[test]
     fn numbers_within_epsilon_are_equal() {
         let l = Value::Number(1.0);
-        let r = Value::Number(1.0 + f64::EPSILON / 2.0);
+        let r = Value::Number(1.0 + FLOAT_TOLERANCE / 2.0);
         assert!(Matcher::compare_values(&l, &r, Operator::Eq));
     }
 
     #[test]
     fn numbers_outside_epsilon_are_not_equal() {
         let l = Value::Number(1.0);
-        let r = Value::Number(1.0 + f64::EPSILON * 2.0);
+        let r = Value::Number(1.0 + FLOAT_TOLERANCE * 2.0);
         assert!(!Matcher::compare_values(&l, &r, Operator::Eq));
+    }
+
+    #[test]
+    fn ordering_within_tolerance_is_equal() {
+        let l = Value::Number(1.0);
+        let r = Value::Number(1.0 + FLOAT_TOLERANCE / 2.0);
+        assert!(!Matcher::compare_values(&l, &r, Operator::Lt));
+        assert!(Matcher::compare_values(&l, &r, Operator::Le));
+        assert!(!Matcher::compare_values(&r, &l, Operator::Gt));
+        assert!(Matcher::compare_values(&r, &l, Operator::Ge));
+    }
+
+    #[test]
+    fn ordering_outside_tolerance_respects_direction() {
+        let l = Value::Number(1.0);
+        let r = Value::Number(1.0 + FLOAT_TOLERANCE * 2.0);
+        assert!(Matcher::compare_values(&l, &r, Operator::Lt));
+        assert!(Matcher::compare_values(&r, &l, Operator::Gt));
+    }
+
+    #[test]
+    fn nan_comparisons_are_always_false() {
+        let nan = Value::Number(f64::NAN);
+        let num = Value::Number(1.0);
+        assert!(!Matcher::compare_values(&nan, &num, Operator::Eq));
+        assert!(!Matcher::compare_values(&nan, &num, Operator::Lt));
+        assert!(!Matcher::compare_values(&nan, &num, Operator::Gt));
+    }
+
+    #[test]
+    fn infinity_comparisons() {
+        let inf = Value::Number(f64::INFINITY);
+        let neg_inf = Value::Number(f64::NEG_INFINITY);
+        let num = Value::Number(1.0);
+        assert!(Matcher::compare_values(&inf, &inf, Operator::Eq));
+        assert!(Matcher::compare_values(&neg_inf, &neg_inf, Operator::Eq));
+        assert!(Matcher::compare_values(&inf, &num, Operator::Gt));
+        assert!(Matcher::compare_values(&neg_inf, &num, Operator::Lt));
     }
 
     #[test]
