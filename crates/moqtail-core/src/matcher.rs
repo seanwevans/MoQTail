@@ -68,6 +68,17 @@ impl Matcher {
         Self::match_steps(&self.selector.steps, &segments, msg)
     }
 
+    /// Runs the post-match processing stages on a message.
+    ///
+    /// Each stage is evaluated sequentially once [`matches`](Self::matches) returns
+    /// `true`. Windowing stages maintain a deque of the most recent values while
+    /// aggregation stages (`sum`, `avg`, `count`) compute their result over that
+    /// window. Missing fields cause processing to short-circuit with `None`.
+    ///
+    /// Complexity is roughly `O(stages * window_size)` per message because each
+    /// aggregation iterates over the current window. Empty topics are handled by
+    /// [`matches`](Self::matches) yielding `false` before processing, so `process`
+    /// only runs on matching topics.
     pub fn process(&mut self, msg: &Message) -> Option<f64> {
         if !self.matches(msg) {
             return None;
@@ -115,6 +126,17 @@ impl Matcher {
         result
     }
 
+    /// Iteratively traverses the selector steps against the topic segments.
+    ///
+    /// A manual stack stores pairs of `(step_index, topic_index)` representing
+    /// the traversal state. This avoids recursion and allows exploring multiple
+    /// branches introduced by wildcards and descendant axes. The algorithm
+    /// short-circuits once a full match is found.
+    ///
+    /// Complexity is approximately `O(steps * segments)` in typical cases, but
+    /// nested wildcards (e.g. `#` combined with descendant axes) may lead to a
+    /// combinatorial explosion of states. Empty topics are represented as an
+    /// empty slice and handled naturally by the traversal.
     fn match_steps(steps: &[Step], topic: &[&str], msg: &Message) -> bool {
         let mut stack: Vec<(usize, usize)> = vec![(0, 0)];
         while let Some((step_idx, topic_idx)) = stack.pop() {
@@ -144,6 +166,17 @@ impl Matcher {
         false
     }
 
+    /// Expands the traversal stack for a single step at a given topic index.
+    ///
+    /// Depending on the [`Segment`] variant, it pushes one or more new states:
+    ///
+    /// * `Literal` matches an exact segment.
+    /// * `Plus` consumes exactly one segment.
+    /// * `Hash` explores all remaining suffixes, matching zero or more segments.
+    /// * `Message` does not consume any segment.
+    ///
+    /// In the presence of nested wildcards the number of states can grow
+    /// quickly, which impacts matching complexity.
     fn match_child(
         stack: &mut Vec<(usize, usize)>,
         step: &Step,
