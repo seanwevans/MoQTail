@@ -156,8 +156,9 @@ fn parse_field(inner_field: pest::iterators::Pair<Rule>) -> Result<Field, Error>
         Rule::ident => Ok(Field::Header(inner_field.as_str().to_string())),
         Rule::json_field => {
             let text = inner_field.as_str();
-            // The grammar guarantees the prefix, so this unwrap is safe.
-            let without = text.strip_prefix("json$").unwrap_or_default();
+            // The grammar should provide the prefix, but validate to produce a
+            // dedicated error when it is missing.
+            let without = text.strip_prefix("json$").ok_or(Error::MissingField)?;
             let parts: Vec<String> = without
                 .split('.')
                 .filter(|p| !p.is_empty())

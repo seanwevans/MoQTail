@@ -1,6 +1,6 @@
 use moqtail_core::{
     ast::{Axis, Field, Operator, Predicate, Segment, Selector, Step, Value},
-    compile,
+    compile, Error,
 };
 
 #[test]
@@ -153,5 +153,6 @@ fn parse_negative_fractional_number() {
 
 #[test]
 fn error_on_malformed_json_prefix() {
-    assert!(compile("/foo[json.temp>30]").is_err());
+    let err = compile("/foo[json.temp>30]").unwrap_err();
+    assert!(matches!(err, Error::MissingField));
 }
