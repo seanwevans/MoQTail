@@ -2,7 +2,7 @@ use crate::ast::{Axis, Field, Operator, Predicate, Segment, Selector, Stage, Ste
 use serde_json::Value as JsonValue;
 use std::borrow::Cow;
 use std::cmp::Ordering;
-use std::collections::{HashMap, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 
 const FLOAT_TOLERANCE: f64 = f64::EPSILON;
 
@@ -139,6 +139,8 @@ impl Matcher {
     /// empty slice and handled naturally by the traversal.
     fn match_steps(steps: &[Step], topic: &[&str], msg: &Message) -> bool {
         let mut stack: Vec<(usize, usize)> = vec![(0, 0)];
+        let mut visited: HashSet<(usize, usize)> = HashSet::from([(0, 0)]);
+
         while let Some((step_idx, topic_idx)) = stack.pop() {
             if step_idx == steps.len() {
                 if topic_idx == topic.len() {
@@ -152,12 +154,26 @@ impl Matcher {
             }
             match step.axis {
                 Axis::Child => {
-                    Self::match_child(&mut stack, step, step_idx + 1, topic, topic_idx);
+                    Self::match_child(
+                        &mut stack,
+                        step,
+                        step_idx + 1,
+                        topic,
+                        topic_idx,
+                        &mut visited,
+                    );
                 }
                 Axis::Descendant => {
                     let mut start = topic_idx;
                     while start <= topic.len() {
-                        Self::match_child(&mut stack, step, step_idx + 1, topic, start);
+                        Self::match_child(
+                            &mut stack,
+                            step,
+                            step_idx + 1,
+                            topic,
+                            start,
+                            &mut visited,
+                        );
                         start += 1;
                     }
                 }
@@ -183,29 +199,42 @@ impl Matcher {
         next_step: usize,
         topic: &[&str],
         idx: usize,
+        visited: &mut HashSet<(usize, usize)>,
     ) {
         match step.segment {
             Segment::Literal(ref lit) => {
                 if let Some(seg) = topic.get(idx) {
                     if lit == seg {
-                        stack.push((next_step, idx + 1));
+                        let state = (next_step, idx + 1);
+                        if visited.insert(state) {
+                            stack.push(state);
+                        }
                     }
                 }
             }
             Segment::Plus => {
                 if topic.get(idx).is_some() {
-                    stack.push((next_step, idx + 1));
+                    let state = (next_step, idx + 1);
+                    if visited.insert(state) {
+                        stack.push(state);
+                    }
                 }
             }
             Segment::Hash => {
                 let mut i = idx;
                 while i <= topic.len() {
-                    stack.push((next_step, i));
+                    let state = (next_step, i);
+                    if visited.insert(state) {
+                        stack.push(state);
+                    }
                     i += 1;
                 }
             }
             Segment::Message => {
-                stack.push((next_step, idx));
+                let state = (next_step, idx);
+                if visited.insert(state) {
+                    stack.push(state);
+                }
             }
         }
     }
@@ -321,6 +350,7 @@ mod tests {
     use serde_json::json;
     use std::borrow::Cow;
     use std::collections::HashMap;
+    use std::time::{Duration, Instant};
 
     fn make_msg(topic: &str) -> Message<'_> {
         Message {
@@ -584,5 +614,27 @@ mod tests {
             payload: None,
         };
         assert_eq!(m.process(&msg3), Some(2.0));
+    }
+
+    #[test]
+    fn nested_wildcards_terminate_and_match() {
+        let sel = compile("//#/#/sensor").unwrap();
+        let m = Matcher::new(sel);
+        let mut segments: Vec<String> = (0..20).map(|i| format!("seg{}", i)).collect();
+        segments.push("sensor".to_string());
+        let topic = segments.join("/");
+        let start = Instant::now();
+        assert!(m.matches(&make_msg(&topic)));
+        assert!(start.elapsed() < Duration::from_millis(200));
+    }
+
+    #[test]
+    fn nested_wildcards_terminate_and_no_match() {
+        let sel = compile("//#/#/sensor").unwrap();
+        let m = Matcher::new(sel);
+        let mut segments: Vec<String> = (0..20).map(|i| format!("seg{}", i)).collect();
+        segments.push("other".to_string());
+        let topic = segments.join("/");
+        assert!(!m.matches(&make_msg(&topic)));
     }
 }
