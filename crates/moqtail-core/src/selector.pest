@@ -12,7 +12,9 @@ predicate = { "[" ~ field ~ operator ~ value ~ "]" }
 
 field = { json_field | ident }
 
-json_field = { "json$" ~ ("." ~ ident)+ }
+// Allow parsing of malformed prefixes so that the parser can surface a
+// dedicated `MissingField` error when validation fails.
+json_field = { "json" ~ ( "$" ~ ("." ~ ident)* | ("." ~ ident)+ ) }
 
 operator = { "<=" | ">=" | "<" | ">" | "=" }
 

@@ -1,4 +1,4 @@
-use moqtail_core::{compile, Matcher, Message};
+use moqtail_core::{compile, Error, Matcher, Message};
 use serde_json::json;
 use std::borrow::Cow;
 use std::collections::HashMap;
@@ -56,5 +56,6 @@ fn json_predicate_fractional() {
 
 #[test]
 fn json_predicate_missing_field() {
-    assert!(compile(" /foo[json$>1]").is_err());
+    let err = compile("/foo[json$>1]").unwrap_err();
+    assert!(matches!(err, Error::MissingField));
 }
