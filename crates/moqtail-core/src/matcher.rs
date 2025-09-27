@@ -331,8 +331,10 @@ impl Matcher {
                 let v = json_path(msg.payload.as_ref()?, path)?;
                 if let Some(f) = v.as_f64() {
                     Some(f)
+                } else if let Some(i) = v.as_i64() {
+                    Some(i as f64)
                 } else {
-                    v.as_i64().map(|i| i as f64)
+                    v.as_u64().map(|u| u as f64)
                 }
             }
         }
