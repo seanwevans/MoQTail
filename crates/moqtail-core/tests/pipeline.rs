@@ -146,3 +146,19 @@ fn window_minutes_and_hours_parse() {
     let hours = compile("/sensor |> window(1h)").unwrap();
     assert!(matches!(hours.stages.as_slice(), [Stage::Window(3600)]));
 }
+
+#[test]
+fn sum_requires_field_argument() {
+    assert!(matches!(
+        compile("/foo |> sum(1s)"),
+        Err(moqtail_core::Error::SumRequiresField)
+    ));
+}
+
+#[test]
+fn avg_requires_field_argument() {
+    assert!(matches!(
+        compile("/foo |> avg(window(5s))"),
+        Err(moqtail_core::Error::AvgRequiresField)
+    ));
+}
