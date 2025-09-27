@@ -2,6 +2,7 @@ use pest::Parser;
 use pest_derive::Parser;
 
 use crate::ast::{Axis, Field, Operator, Predicate, Segment, Selector, Stage, Step, Value};
+use std::time::Duration;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
