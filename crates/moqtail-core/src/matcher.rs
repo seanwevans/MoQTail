@@ -3,6 +3,7 @@ use serde_json::Value as JsonValue;
 use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet, VecDeque};
+use std::time::{Duration, Instant};
 
 const FLOAT_TOLERANCE: f64 = f64::EPSILON;
 
@@ -13,8 +14,14 @@ pub struct Message<'a> {
 }
 
 enum StageState {
-    Window { size: usize, values: VecDeque<f64> },
-    Counter { size: usize, count: usize },
+    Window {
+        duration: Duration,
+        values: VecDeque<(Instant, f64)>,
+    },
+    Counter {
+        duration: Duration,
+        timestamps: VecDeque<Instant>,
+    },
 }
 
 pub struct Matcher {
@@ -32,23 +39,23 @@ fn json_path<'a>(root: &'a JsonValue, path: &[String]) -> Option<&'a JsonValue> 
 
 impl Matcher {
     pub fn new(selector: Selector) -> Self {
-        let mut window_size = 1usize;
+        let mut window_duration = Duration::ZERO;
         let mut stage_states = Vec::new();
         for stage in &selector.stages {
             match stage {
-                Stage::Window(n) => {
-                    window_size = *n as usize;
+                Stage::Window(duration) => {
+                    window_duration = *duration;
                 }
                 Stage::Sum(_) | Stage::Avg(_) => {
                     stage_states.push(StageState::Window {
-                        size: window_size,
+                        duration: window_duration,
                         values: VecDeque::new(),
                     });
                 }
                 Stage::Count => {
                     stage_states.push(StageState::Counter {
-                        size: window_size,
-                        count: 0,
+                        duration: window_duration,
+                        timestamps: VecDeque::new(),
                     });
                 }
             }
@@ -67,15 +74,20 @@ impl Matcher {
     /// Runs the post-match processing stages on a message.
     ///
     /// Each stage is evaluated sequentially once [`matches`](Self::matches) returns
-    /// `true`. Windowing stages maintain a deque of the most recent values while
-    /// aggregation stages (`sum`, `avg`, `count`) compute their result over that
-    /// window. Missing fields cause processing to short-circuit with `None`.
+    /// `true`. Windowing stages configure the trailing [`Duration`] used by
+    /// subsequent aggregations. Aggregation stages (`sum`, `avg`, `count`) retain
+    /// timestamped samples and evict entries whose age exceeds that duration,
+    /// defaulting to a zero-length window (i.e. only the current sample) when no
+    /// window is specified. Missing fields cause processing to short-circuit with
+    /// `None`.
     ///
-    /// Complexity is roughly `O(stages * window_size)` per message because each
-    /// aggregation iterates over the current window. Empty topics are handled by
-    /// [`matches`](Self::matches) yielding `false` before processing, so `process`
-    /// only runs on matching topics.
-    pub fn process(&mut self, msg: &Message) -> Option<f64> {
+    /// Complexity is roughly `O(stages * retained_samples)` per message because
+    /// each aggregation iterates over the samples currently inside the window.
+    /// Expired entries are removed from the front of the deque in amortized
+    /// constant time. Empty topics are handled by [`matches`](Self::matches)
+    /// yielding `false` before processing, so `process` only runs on matching
+    /// topics.
+    pub fn process(&mut self, msg: &Message, timestamp: Instant) -> Option<f64> {
         if !self.matches(msg) {
             return None;
         }
@@ -85,41 +97,63 @@ impl Matcher {
             match stage {
                 Stage::Window(_) => {}
                 Stage::Sum(field) => {
-                    if let StageState::Window { size, values } = &mut self.stage_states[state_idx] {
+                    if let StageState::Window { duration, values } =
+                        &mut self.stage_states[state_idx]
+                    {
                         let v = Self::extract_field(field, msg)?;
-                        values.push_back(v);
-                        if values.len() > *size {
-                            values.pop_front();
-                        }
-                        result = Some(values.iter().sum());
+                        values.push_back((timestamp, v));
+                        Self::prune_values(values, *duration, timestamp);
+                        result = Some(values.iter().map(|(_, value)| *value).sum());
                     }
                     state_idx += 1;
                 }
                 Stage::Avg(field) => {
-                    if let StageState::Window { size, values } = &mut self.stage_states[state_idx] {
+                    if let StageState::Window { duration, values } =
+                        &mut self.stage_states[state_idx]
+                    {
                         let v = Self::extract_field(field, msg)?;
-                        values.push_back(v);
-                        if values.len() > *size {
-                            values.pop_front();
-                        }
-                        let sum: f64 = values.iter().sum();
+                        values.push_back((timestamp, v));
+                        Self::prune_values(values, *duration, timestamp);
+                        let sum: f64 = values.iter().map(|(_, value)| *value).sum();
                         result = Some(sum / values.len() as f64);
                     }
                     state_idx += 1;
                 }
                 Stage::Count => {
-                    if let StageState::Counter { size, count } = &mut self.stage_states[state_idx] {
-                        *count += 1;
-                        if *count > *size {
-                            *count -= 1;
-                        }
-                        result = Some(*count as f64);
+                    if let StageState::Counter {
+                        duration,
+                        timestamps,
+                    } = &mut self.stage_states[state_idx]
+                    {
+                        timestamps.push_back(timestamp);
+                        Self::prune_timestamps(timestamps, *duration, timestamp);
+                        result = Some(timestamps.len() as f64);
                     }
                     state_idx += 1;
                 }
             }
         }
         result
+    }
+
+    fn prune_values(values: &mut VecDeque<(Instant, f64)>, duration: Duration, now: Instant) {
+        while let Some((ts, _)) = values.front() {
+            if now.saturating_duration_since(*ts) > duration {
+                values.pop_front();
+            } else {
+                break;
+            }
+        }
+    }
+
+    fn prune_timestamps(timestamps: &mut VecDeque<Instant>, duration: Duration, now: Instant) {
+        while let Some(ts) = timestamps.front() {
+            if now.saturating_duration_since(*ts) > duration {
+                timestamps.pop_front();
+            } else {
+                break;
+            }
+        }
     }
 
     /// Iteratively traverses the selector steps against the topic segments.
@@ -481,14 +515,15 @@ mod tests {
             headers: HashMap::from([(Cow::Borrowed("temp"), Cow::Borrowed("10"))]),
             payload: None,
         };
-        assert_eq!(m.process(&msg1), Some(10.0));
+        let start = Instant::now();
+        assert_eq!(m.process(&msg1, start), Some(10.0));
 
         let msg2 = Message {
             topic: "sensor",
             headers: HashMap::from([(Cow::Borrowed("temp"), Cow::Borrowed("20"))]),
             payload: None,
         };
-        assert_eq!(m.process(&msg2), Some(20.0));
+        assert_eq!(m.process(&msg2, start + Duration::from_secs(1)), Some(20.0));
     }
 
     #[test]
@@ -501,21 +536,25 @@ mod tests {
             headers: HashMap::from([(Cow::Borrowed("temp"), Cow::Borrowed("10"))]),
             payload: None,
         };
-        assert_eq!(m.process(&msg1), Some(10.0));
+        let start = Instant::now();
+        assert_eq!(m.process(&msg1, start), Some(10.0));
 
         let msg2 = Message {
             topic: "sensor",
             headers: HashMap::from([(Cow::Borrowed("temp"), Cow::Borrowed("20"))]),
             payload: None,
         };
-        assert_eq!(m.process(&msg2), Some(30.0));
+        assert_eq!(m.process(&msg2, start + Duration::from_secs(1)), Some(30.0));
 
         let msg3 = Message {
             topic: "sensor",
             headers: HashMap::from([(Cow::Borrowed("temp"), Cow::Borrowed("30"))]),
             payload: None,
         };
-        assert_eq!(m.process(&msg3), Some(50.0));
+        assert_eq!(m.process(&msg3, start + Duration::from_secs(3)), Some(50.0));
+
+        // Once the second sample ages out, only the most recent value remains.
+        assert_eq!(m.process(&msg3, start + Duration::from_secs(6)), Some(30.0));
     }
 
     #[test]
@@ -528,14 +567,15 @@ mod tests {
             headers: HashMap::new(),
             payload: Some(json!({"value": 10})),
         };
-        assert_eq!(m.process(&msg1), Some(10.0));
+        let start = Instant::now();
+        assert_eq!(m.process(&msg1, start), Some(10.0));
 
         let msg2 = Message {
             topic: "sensor",
             headers: HashMap::new(),
             payload: Some(json!({"value": 20})),
         };
-        assert_eq!(m.process(&msg2), Some(20.0));
+        assert_eq!(m.process(&msg2, start + Duration::from_secs(2)), Some(20.0));
     }
 
     #[test]
@@ -548,21 +588,24 @@ mod tests {
             headers: HashMap::new(),
             payload: Some(json!({"value": 10})),
         };
-        assert_eq!(m.process(&msg1), Some(10.0));
+        let start = Instant::now();
+        assert_eq!(m.process(&msg1, start), Some(10.0));
 
         let msg2 = Message {
             topic: "sensor",
             headers: HashMap::new(),
             payload: Some(json!({"value": 20})),
         };
-        assert_eq!(m.process(&msg2), Some(15.0));
+        assert_eq!(m.process(&msg2, start + Duration::from_secs(1)), Some(15.0));
 
         let msg3 = Message {
             topic: "sensor",
             headers: HashMap::new(),
             payload: Some(json!({"value": 30})),
         };
-        assert_eq!(m.process(&msg3), Some(25.0));
+        assert_eq!(m.process(&msg3, start + Duration::from_secs(3)), Some(25.0));
+
+        assert_eq!(m.process(&msg3, start + Duration::from_secs(6)), Some(30.0));
     }
 
     #[test]
@@ -575,14 +618,15 @@ mod tests {
             headers: HashMap::new(),
             payload: None,
         };
-        assert_eq!(m.process(&msg1), Some(1.0));
+        let start = Instant::now();
+        assert_eq!(m.process(&msg1, start), Some(1.0));
 
         let msg2 = Message {
             topic: "sensor",
             headers: HashMap::new(),
             payload: None,
         };
-        assert_eq!(m.process(&msg2), Some(1.0));
+        assert_eq!(m.process(&msg2, start + Duration::from_secs(1)), Some(1.0));
     }
 
     #[test]
@@ -595,21 +639,24 @@ mod tests {
             headers: HashMap::new(),
             payload: None,
         };
-        assert_eq!(m.process(&msg1), Some(1.0));
+        let start = Instant::now();
+        assert_eq!(m.process(&msg1, start), Some(1.0));
 
         let msg2 = Message {
             topic: "sensor",
             headers: HashMap::new(),
             payload: None,
         };
-        assert_eq!(m.process(&msg2), Some(2.0));
+        assert_eq!(m.process(&msg2, start + Duration::from_secs(1)), Some(2.0));
 
         let msg3 = Message {
             topic: "sensor",
             headers: HashMap::new(),
             payload: None,
         };
-        assert_eq!(m.process(&msg3), Some(2.0));
+        assert_eq!(m.process(&msg3, start + Duration::from_secs(3)), Some(2.0));
+
+        assert_eq!(m.process(&msg3, start + Duration::from_secs(6)), Some(1.0));
     }
 
     #[test]
