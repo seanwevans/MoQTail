@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use moqtail_core::{compile, Matcher, Message};
 
 #[test]
-fn matches_trailing_slash() {
+fn trailing_empty_segment_requires_wildcard() {
     let selector = compile("/foo/bar").unwrap();
     let matcher = Matcher::new(selector);
 
@@ -13,11 +13,11 @@ fn matches_trailing_slash() {
         payload: None,
     };
 
-    assert!(matcher.matches(&msg));
+    assert!(!matcher.matches(&msg));
 }
 
 #[test]
-fn matches_repeated_slashes() {
+fn literal_does_not_skip_empty_segments() {
     let selector = compile("/foo/bar").unwrap();
     let matcher = Matcher::new(selector);
 
@@ -27,11 +27,11 @@ fn matches_repeated_slashes() {
         payload: None,
     };
 
-    assert!(matcher.matches(&msg));
+    assert!(!matcher.matches(&msg));
 }
 
 #[test]
-fn trailing_slash_does_not_match_plus() {
+fn plus_matches_empty_segment() {
     let selector = compile("/foo/+").unwrap();
     let matcher = Matcher::new(selector);
 
@@ -41,5 +41,5 @@ fn trailing_slash_does_not_match_plus() {
         payload: None,
     };
 
-    assert!(!matcher.matches(&msg));
+    assert!(matcher.matches(&msg));
 }

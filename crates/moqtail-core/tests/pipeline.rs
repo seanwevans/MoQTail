@@ -1,4 +1,4 @@
-use moqtail_core::{compile, Matcher, Message};
+use moqtail_core::{ast::Stage, compile, Matcher, Message};
 use serde_json::json;
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
@@ -80,6 +80,21 @@ fn sum_pipeline() {
 }
 
 #[test]
+fn sum_pipeline_large_unsigned() {
+    let sel = compile("/sensor |> window(60s) |> sum(json$.value)").unwrap();
+    let mut m = Matcher::new(sel);
+
+    let headers = HashMap::new();
+
+    let msg = Message {
+        topic: "sensor",
+        headers,
+        payload: Some(json!({"value": u64::MAX})),
+    };
+    assert_eq!(m.process(&msg), Some(u64::MAX as f64));
+}
+
+#[test]
 fn count_pipeline() {
     let sel = compile("/sensor |> window(60s) |> count()").unwrap();
     let mut m = Matcher::new(sel);
@@ -121,4 +136,13 @@ fn sum_missing_field() {
         payload: Some(json!({"other": 10})),
     };
     assert_eq!(m.process(&msg, Instant::now()), None);
+}
+
+#[test]
+fn window_minutes_and_hours_parse() {
+    let minutes = compile("/sensor |> window(5m)").unwrap();
+    assert!(matches!(minutes.stages.as_slice(), [Stage::Window(300)]));
+
+    let hours = compile("/sensor |> window(1h)").unwrap();
+    assert!(matches!(hours.stages.as_slice(), [Stage::Window(3600)]));
 }
