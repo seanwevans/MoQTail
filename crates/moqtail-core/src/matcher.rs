@@ -60,7 +60,7 @@ impl Matcher {
     }
 
     pub fn matches(&self, msg: &Message) -> bool {
-        let segments: Vec<&str> = msg.topic.split('/').filter(|s| !s.is_empty()).collect();
+        let segments: Vec<&str> = msg.topic.split('/').collect();
         Self::match_steps(&self.selector.steps, &segments, msg)
     }
 

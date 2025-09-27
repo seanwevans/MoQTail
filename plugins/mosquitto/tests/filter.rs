@@ -71,8 +71,19 @@ fn filter_integration() {
 
         assert_eq!(cb(7, &mut msg as *mut _ as *mut c_void, ctx), 0);
 
-        let topic2 = CString::new("baz/qux").unwrap();
+        let topic2 = CString::new("foo/").unwrap();
         msg.topic = topic2.as_ptr() as *mut c_char;
+        assert_eq!(cb(7, &mut msg as *mut _ as *mut c_void, ctx), 0);
+
+        let topic3 = CString::new("foo//bar").unwrap();
+        msg.topic = topic3.as_ptr() as *mut c_char;
+        assert_eq!(
+            cb(7, &mut msg as *mut _ as *mut c_void, ctx),
+            MOSQ_ERR_PLUGIN_DEFER
+        );
+
+        let topic4 = CString::new("baz/qux").unwrap();
+        msg.topic = topic4.as_ptr() as *mut c_char;
         assert_eq!(
             cb(7, &mut msg as *mut _ as *mut c_void, ctx),
             MOSQ_ERR_PLUGIN_DEFER
