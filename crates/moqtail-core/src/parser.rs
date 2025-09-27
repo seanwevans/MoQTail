@@ -2,6 +2,7 @@ use pest::Parser;
 use pest_derive::Parser;
 
 use crate::ast::{Axis, Field, Operator, Predicate, Segment, Selector, Stage, Step, Value};
+use std::time::Duration;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -189,7 +190,14 @@ fn parse_stage(pair: pest::iterators::Pair<Rule>) -> Result<Stage, Error> {
             let mut ai = a.into_inner();
             let num_pair = ai.next().ok_or(Error::WindowRequiresDuration)?;
             let num = num_pair.as_str().parse::<u64>()?;
-            Ok(Stage::Window(num))
+            let unit_pair = ai.next().ok_or(Error::WindowRequiresDuration)?;
+            let seconds = match unit_pair.as_str() {
+                "s" => num,
+                "m" => num.checked_mul(60).ok_or(Error::WindowRequiresDuration)?,
+                "h" => num.checked_mul(3600).ok_or(Error::WindowRequiresDuration)?,
+                _ => unreachable!(),
+            };
+            Ok(Stage::Window(seconds))
         }
         "sum" => {
             let a = arg.ok_or(Error::SumRequiresField)?;

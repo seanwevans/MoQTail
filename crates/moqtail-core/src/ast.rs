@@ -54,7 +54,7 @@ pub struct Step {
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Stage {
-    Window(u64),
+    Window(Duration),
     Sum(Field),
     Avg(Field),
     Count,
@@ -67,6 +67,7 @@ pub struct Selector {
 }
 
 use std::fmt;
+use std::time::Duration;
 
 impl fmt::Display for Selector {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -95,7 +96,7 @@ impl fmt::Display for Selector {
         }
         for stage in &self.stages {
             match stage {
-                Stage::Window(s) => write!(f, " |> window({s}s)")?,
+                Stage::Window(duration) => write!(f, " |> window({}s)", duration.as_secs())?,
                 Stage::Sum(field) => write!(f, " |> sum({})", display_field(field))?,
                 Stage::Avg(field) => write!(f, " |> avg({})", display_field(field))?,
                 Stage::Count => write!(f, " |> count()")?,

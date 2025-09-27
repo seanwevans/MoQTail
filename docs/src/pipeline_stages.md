@@ -4,7 +4,8 @@ Selectors can transform and aggregate matched messages using a Unix-like pipelin
 
 ## `window(duration)`
 
-Groups messages into tumbling time windows. The duration is specified in seconds.
+Groups messages into tumbling time windows. Specify the duration as a number
+followed by a unit suffix: `s` for seconds, `m` for minutes, or `h` for hours.
 
 ```bash
 $ moqtail sub "//sensor |> window(60s)"
