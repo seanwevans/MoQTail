@@ -193,11 +193,17 @@ fn parse_stage(pair: pest::iterators::Pair<Rule>) -> Result<Stage, Error> {
         }
         "sum" => {
             let a = arg.ok_or(Error::SumRequiresField)?;
+            if a.as_rule() != Rule::field {
+                return Err(Error::SumRequiresField);
+            }
             let field_inner = a.into_inner().next().ok_or(Error::SumRequiresField)?;
             Ok(Stage::Sum(parse_field(field_inner)?))
         }
         "avg" => {
             let a = arg.ok_or(Error::AvgRequiresField)?;
+            if a.as_rule() != Rule::field {
+                return Err(Error::AvgRequiresField);
+            }
             let field_inner = a.into_inner().next().ok_or(Error::AvgRequiresField)?;
             Ok(Stage::Avg(parse_field(field_inner)?))
         }

@@ -80,3 +80,19 @@ fn sum_missing_field() {
     };
     assert_eq!(m.process(&msg), None);
 }
+
+#[test]
+fn sum_requires_field_argument() {
+    assert!(matches!(
+        compile("/foo |> sum(1s)"),
+        Err(moqtail_core::Error::SumRequiresField)
+    ));
+}
+
+#[test]
+fn avg_requires_field_argument() {
+    assert!(matches!(
+        compile("/foo |> avg(window(5s))"),
+        Err(moqtail_core::Error::AvgRequiresField)
+    ));
+}

@@ -33,5 +33,5 @@ value = { boolean | number | string }
 stage = { pipe ~ function }
 pipe = _{ "|>" }
 function = { ident ~ "(" ~ func_arg? ~ ")" }
-func_arg = _{ duration | field }
+func_arg = _{ duration | function | field }
 duration = { number ~ "s" }
