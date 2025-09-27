@@ -47,6 +47,21 @@ fn sum_pipeline() {
 }
 
 #[test]
+fn sum_pipeline_large_unsigned() {
+    let sel = compile("/sensor |> window(60s) |> sum(json$.value)").unwrap();
+    let mut m = Matcher::new(sel);
+
+    let headers = HashMap::new();
+
+    let msg = Message {
+        topic: "sensor",
+        headers,
+        payload: Some(json!({"value": u64::MAX})),
+    };
+    assert_eq!(m.process(&msg), Some(u64::MAX as f64));
+}
+
+#[test]
 fn count_pipeline() {
     let sel = compile("/sensor |> window(60s) |> count()").unwrap();
     let mut m = Matcher::new(sel);
