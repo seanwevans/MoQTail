@@ -1,4 +1,5 @@
 # MoQTail
+<img width="256" alt="Vintage Coffee Moment" src="https://github.com/user-attachments/assets/4a15fe05-09cc-4f63-a189-1e085e06efe5" />
 
 > **MoQTail** — *MQTT‑optimized Query* **Tail**: bring XPath‑level precision to your MQTT streams.
 
