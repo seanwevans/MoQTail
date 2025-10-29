@@ -197,7 +197,7 @@ fn parse_stage(pair: pest::iterators::Pair<Rule>) -> Result<Stage, Error> {
                 "h" => num.checked_mul(3600).ok_or(Error::WindowRequiresDuration)?,
                 _ => unreachable!(),
             };
-            Ok(Stage::Window(seconds))
+            Ok(Stage::Window(Duration::from_secs(seconds)))
         }
         "sum" => {
             let a = arg.ok_or(Error::SumRequiresField)?;

@@ -34,4 +34,5 @@ stage = { pipe ~ function }
 pipe = _{ "|>" }
 function = { ident ~ "(" ~ func_arg? ~ ")" }
 func_arg = _{ duration | function | field }
-duration = { number ~ "s" }
+duration = { number ~ duration_unit }
+duration_unit = { "s" | "m" | "h" }
