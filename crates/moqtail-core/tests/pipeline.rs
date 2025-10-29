@@ -91,7 +91,7 @@ fn sum_pipeline_large_unsigned() {
         headers,
         payload: Some(json!({"value": u64::MAX})),
     };
-    assert_eq!(m.process(&msg), Some(u64::MAX as f64));
+    assert_eq!(m.process(&msg, Instant::now()), Some(u64::MAX as f64));
 }
 
 #[test]
@@ -141,10 +141,52 @@ fn sum_missing_field() {
 #[test]
 fn window_minutes_and_hours_parse() {
     let minutes = compile("/sensor |> window(5m)").unwrap();
-    assert!(matches!(minutes.stages.as_slice(), [Stage::Window(300)]));
+    assert_eq!(
+        minutes.stages.as_slice(),
+        [Stage::Window(Duration::from_secs(300))]
+    );
 
     let hours = compile("/sensor |> window(1h)").unwrap();
-    assert!(matches!(hours.stages.as_slice(), [Stage::Window(3600)]));
+    assert_eq!(
+        hours.stages.as_slice(),
+        [Stage::Window(Duration::from_secs(3600))]
+    );
+}
+
+#[test]
+fn window_minutes_and_hours_pipeline() {
+    let headers = HashMap::new();
+    let msg = Message {
+        topic: "sensor",
+        headers: headers.clone(),
+        payload: None,
+    };
+
+    let minutes_sel = compile("/sensor |> window(5m) |> count()").unwrap();
+    let mut minutes_matcher = Matcher::new(minutes_sel);
+    let minutes_start = Instant::now();
+    assert_eq!(minutes_matcher.process(&msg, minutes_start), Some(1.0));
+    assert_eq!(
+        minutes_matcher.process(&msg, minutes_start + Duration::from_secs(120)),
+        Some(2.0)
+    );
+    assert_eq!(
+        minutes_matcher.process(&msg, minutes_start + Duration::from_secs(301)),
+        Some(2.0)
+    );
+
+    let hours_sel = compile("/sensor |> window(1h) |> count()").unwrap();
+    let mut hours_matcher = Matcher::new(hours_sel);
+    let hours_start = Instant::now();
+    assert_eq!(hours_matcher.process(&msg, hours_start), Some(1.0));
+    assert_eq!(
+        hours_matcher.process(&msg, hours_start + Duration::from_secs(1800)),
+        Some(2.0)
+    );
+    assert_eq!(
+        hours_matcher.process(&msg, hours_start + Duration::from_secs(3601)),
+        Some(2.0)
+    );
 }
 
 #[test]
