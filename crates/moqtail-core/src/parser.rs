@@ -45,6 +45,8 @@ pub enum Error {
     SumRequiresField,
     #[error("avg requires field")]
     AvgRequiresField,
+    #[error("count does not accept arguments")]
+    CountDoesNotAcceptArguments,
     #[error("unknown function {0}")]
     UnknownFunction(String),
 }
@@ -187,17 +189,7 @@ fn parse_stage(pair: pest::iterators::Pair<Rule>) -> Result<Stage, Error> {
     match name {
         "window" => {
             let a = arg.ok_or(Error::WindowRequiresDuration)?;
-            let mut ai = a.into_inner();
-            let num_pair = ai.next().ok_or(Error::WindowRequiresDuration)?;
-            let num = num_pair.as_str().parse::<u64>()?;
-            let unit_pair = ai.next().ok_or(Error::WindowRequiresDuration)?;
-            let seconds = match unit_pair.as_str() {
-                "s" => num,
-                "m" => num.checked_mul(60).ok_or(Error::WindowRequiresDuration)?,
-                "h" => num.checked_mul(3600).ok_or(Error::WindowRequiresDuration)?,
-                _ => unreachable!(),
-            };
-            Ok(Stage::Window(seconds))
+            Ok(Stage::Window(parse_duration(a)?))
         }
         "sum" => {
             let a = arg.ok_or(Error::SumRequiresField)?;
@@ -215,7 +207,26 @@ fn parse_stage(pair: pest::iterators::Pair<Rule>) -> Result<Stage, Error> {
             let field_inner = a.into_inner().next().ok_or(Error::AvgRequiresField)?;
             Ok(Stage::Avg(parse_field(field_inner)?))
         }
-        "count" => Ok(Stage::Count),
+        "count" => match arg {
+            Some(_) => Err(Error::CountDoesNotAcceptArguments),
+            None => Ok(Stage::Count),
+        },
         _ => Err(Error::UnknownFunction(name.to_string())),
     }
+}
+
+fn parse_duration(pair: pest::iterators::Pair<Rule>) -> Result<Duration, Error> {
+    let text = pair.as_str();
+    if text.len() < 2 {
+        return Err(Error::WindowRequiresDuration);
+    }
+    let (value, unit) = text.split_at(text.len() - 1);
+    let num = value.parse::<u64>()?;
+    let seconds = match unit {
+        "s" => num,
+        "m" => num.checked_mul(60).ok_or(Error::WindowRequiresDuration)?,
+        "h" => num.checked_mul(3600).ok_or(Error::WindowRequiresDuration)?,
+        _ => return Err(Error::WindowRequiresDuration),
+    };
+    Ok(Duration::from_secs(seconds))
 }
