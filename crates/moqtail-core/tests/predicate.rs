@@ -59,3 +59,27 @@ fn json_predicate_missing_field() {
     let err = compile("/foo[json$>1]").unwrap_err();
     assert!(matches!(err, Error::MissingField));
 }
+
+#[test]
+fn header_string_predicate_matches_numeric_text() {
+    let sel = compile("/msg[tag=\"123\"]").unwrap();
+    let msg = Message {
+        topic: "",
+        headers: HashMap::from([(Cow::Borrowed("tag"), Cow::Borrowed("123"))]),
+        payload: None,
+    };
+    let matcher = Matcher::new(sel);
+    assert!(matcher.matches(&msg));
+}
+
+#[test]
+fn header_string_predicate_matches_boolean_text() {
+    let sel = compile("/msg[flag=\"true\"]").unwrap();
+    let msg = Message {
+        topic: "",
+        headers: HashMap::from([(Cow::Borrowed("flag"), Cow::Borrowed("true"))]),
+        payload: None,
+    };
+    let matcher = Matcher::new(sel);
+    assert!(matcher.matches(&msg));
+}

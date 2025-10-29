@@ -187,6 +187,16 @@ fn parse_stage(pair: pest::iterators::Pair<Rule>) -> Result<Stage, Error> {
     match name {
         "window" => {
             let a = arg.ok_or(Error::WindowRequiresDuration)?;
+            if a.as_rule() != Rule::duration {
+                return Err(Error::WindowRequiresDuration);
+            }
+            let text = a.as_str();
+            if text.len() < 2 {
+                return Err(Error::WindowRequiresDuration);
+            }
+            let (num_part, unit_part) = text.split_at(text.len() - 1);
+            let num = num_part.parse::<u64>()?;
+            let seconds = match unit_part {
             let duration_text = a.as_str().trim();
             if duration_text.len() < 2 {
                 return Err(Error::WindowRequiresDuration);
@@ -211,7 +221,7 @@ fn parse_stage(pair: pest::iterators::Pair<Rule>) -> Result<Stage, Error> {
                 "s" => num,
                 "m" => num.checked_mul(60).ok_or(Error::WindowRequiresDuration)?,
                 "h" => num.checked_mul(3600).ok_or(Error::WindowRequiresDuration)?,
-                _ => unreachable!(),
+                _ => return Err(Error::WindowRequiresDuration),
             };
             if ai.next().is_some() {
                 return Err(Error::WindowRequiresDuration);

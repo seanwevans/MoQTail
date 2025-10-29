@@ -92,7 +92,7 @@ fn sum_pipeline_large_unsigned() {
         headers,
         payload: Some(json!({"value": u64::MAX})),
     };
-    assert_eq!(m.process(&msg, start), Some(u64::MAX as f64));
+    assert_eq!(m.process(&msg, Instant::now()), Some(u64::MAX as f64));
 }
 
 #[test]
@@ -142,6 +142,15 @@ fn sum_missing_field() {
 #[test]
 fn window_minutes_and_hours_parse() {
     let minutes = compile("/sensor |> window(5m)").unwrap();
+    assert_eq!(
+        minutes.stages.as_slice(),
+        &[Stage::Window(Duration::from_secs(300))]
+    );
+
+    let hours = compile("/sensor |> window(1h)").unwrap();
+    assert_eq!(
+        hours.stages.as_slice(),
+        &[Stage::Window(Duration::from_secs(3600))]
     assert!(matches!(
         minutes.stages.as_slice(),
         [Stage::Window(d)] if *d == Duration::from_secs(300)
