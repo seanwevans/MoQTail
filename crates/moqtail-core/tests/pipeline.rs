@@ -85,13 +85,14 @@ fn sum_pipeline_large_unsigned() {
     let mut m = Matcher::new(sel);
 
     let headers = HashMap::new();
+    let start = Instant::now();
 
     let msg = Message {
         topic: "sensor",
         headers,
         payload: Some(json!({"value": u64::MAX})),
     };
-    assert_eq!(m.process(&msg), Some(u64::MAX as f64));
+    assert_eq!(m.process(&msg, start), Some(u64::MAX as f64));
 }
 
 #[test]
@@ -141,10 +142,16 @@ fn sum_missing_field() {
 #[test]
 fn window_minutes_and_hours_parse() {
     let minutes = compile("/sensor |> window(5m)").unwrap();
-    assert!(matches!(minutes.stages.as_slice(), [Stage::Window(300)]));
+    assert_eq!(
+        minutes.stages.as_slice(),
+        [Stage::Window(Duration::from_secs(300))]
+    );
 
     let hours = compile("/sensor |> window(1h)").unwrap();
-    assert!(matches!(hours.stages.as_slice(), [Stage::Window(3600)]));
+    assert_eq!(
+        hours.stages.as_slice(),
+        [Stage::Window(Duration::from_secs(3600))]
+    );
 }
 
 #[test]
