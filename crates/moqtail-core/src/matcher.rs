@@ -17,6 +17,7 @@ enum StageState {
     Window {
         duration: Duration,
         values: VecDeque<(Instant, f64)>,
+        sum: f64,
     },
     Counter {
         duration: Duration,
@@ -50,6 +51,7 @@ impl Matcher {
                     stage_states.push(StageState::Window {
                         duration: window_duration,
                         values: VecDeque::new(),
+                        sum: 0.0,
                     });
                 }
                 Stage::Count => {
@@ -85,12 +87,12 @@ impl Matcher {
     /// window is specified. Missing fields cause processing to short-circuit with
     /// `None`.
     ///
-    /// Complexity is roughly `O(stages * retained_samples)` per message because
-    /// each aggregation iterates over the samples currently inside the window.
-    /// Expired entries are removed from the front of the deque in amortized
-    /// constant time. Empty topics are handled by [`matches`](Self::matches)
-    /// yielding `false` before processing, so `process` only runs on matching
-    /// topics.
+    /// `sum` and `avg` maintain running totals so they execute in `O(1)` time per
+    /// message, while `count` remains proportional to the number of retained
+    /// samples. Expired entries are removed from the front of the deque in
+    /// amortized constant time. Empty topics are handled by
+    /// [`matches`](Self::matches) yielding `false` before processing, so `process`
+    /// only runs on matching topics.
     pub fn process(&mut self, msg: &Message, timestamp: Instant) -> Option<f64> {
         if !self.matches(msg) {
             return None;
@@ -101,25 +103,37 @@ impl Matcher {
             match stage {
                 Stage::Window(_) => {}
                 Stage::Sum(field) => {
-                    if let StageState::Window { duration, values } =
-                        &mut self.stage_states[state_idx]
+                    if let StageState::Window {
+                        duration,
+                        values,
+                        sum,
+                    } = &mut self.stage_states[state_idx]
                     {
                         let v = Self::extract_field(field, msg)?;
                         values.push_back((timestamp, v));
-                        Self::prune_values(values, *duration, timestamp);
-                        result = Some(values.iter().map(|(_, value)| *value).sum());
+                        *sum += v;
+                        *sum -= Self::prune_values(values, *duration, timestamp);
+                        result = Some(*sum);
                     }
                     state_idx += 1;
                 }
                 Stage::Avg(field) => {
-                    if let StageState::Window { duration, values } =
-                        &mut self.stage_states[state_idx]
+                    if let StageState::Window {
+                        duration,
+                        values,
+                        sum,
+                    } = &mut self.stage_states[state_idx]
                     {
                         let v = Self::extract_field(field, msg)?;
                         values.push_back((timestamp, v));
-                        Self::prune_values(values, *duration, timestamp);
-                        let sum: f64 = values.iter().map(|(_, value)| *value).sum();
-                        result = Some(sum / values.len() as f64);
+                        *sum += v;
+                        *sum -= Self::prune_values(values, *duration, timestamp);
+                        let len = values.len();
+                        result = if len == 0 {
+                            Some(0.0)
+                        } else {
+                            Some(*sum / len as f64)
+                        };
                     }
                     state_idx += 1;
                 }
@@ -140,14 +154,22 @@ impl Matcher {
         result
     }
 
-    fn prune_values(values: &mut VecDeque<(Instant, f64)>, duration: Duration, now: Instant) {
+    fn prune_values(
+        values: &mut VecDeque<(Instant, f64)>,
+        duration: Duration,
+        now: Instant,
+    ) -> f64 {
+        let mut removed_sum = 0.0;
         while let Some((ts, _)) = values.front() {
             if now.saturating_duration_since(*ts) > duration {
-                values.pop_front();
+                if let Some((_, value)) = values.pop_front() {
+                    removed_sum += value;
+                }
             } else {
                 break;
             }
         }
+        removed_sum
     }
 
     fn prune_timestamps(timestamps: &mut VecDeque<Instant>, duration: Duration, now: Instant) {
