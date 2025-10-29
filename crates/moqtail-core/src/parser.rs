@@ -187,16 +187,28 @@ fn parse_stage(pair: pest::iterators::Pair<Rule>) -> Result<Stage, Error> {
     match name {
         "window" => {
             let a = arg.ok_or(Error::WindowRequiresDuration)?;
+            if a.as_rule() != Rule::duration {
+                return Err(Error::WindowRequiresDuration);
+            }
             let mut ai = a.into_inner();
             let num_pair = ai.next().ok_or(Error::WindowRequiresDuration)?;
+            if num_pair.as_rule() != Rule::number {
+                return Err(Error::WindowRequiresDuration);
+            }
             let num = num_pair.as_str().parse::<u64>()?;
             let unit_pair = ai.next().ok_or(Error::WindowRequiresDuration)?;
+            if unit_pair.as_rule() != Rule::unit {
+                return Err(Error::WindowRequiresDuration);
+            }
             let seconds = match unit_pair.as_str() {
                 "s" => num,
                 "m" => num.checked_mul(60).ok_or(Error::WindowRequiresDuration)?,
                 "h" => num.checked_mul(3600).ok_or(Error::WindowRequiresDuration)?,
                 _ => unreachable!(),
             };
+            if ai.next().is_some() {
+                return Err(Error::WindowRequiresDuration);
+            }
             Ok(Stage::Window(Duration::from_secs(seconds)))
         }
         "sum" => {
