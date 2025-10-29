@@ -141,6 +141,16 @@ fn sum_missing_field() {
 #[test]
 fn window_minutes_and_hours_parse() {
     let minutes = compile("/sensor |> window(5m)").unwrap();
+    assert!(matches!(
+        minutes.stages.as_slice(),
+        [Stage::Window(d)] if *d == Duration::from_secs(300)
+    ));
+
+    let hours = compile("/sensor |> window(1h)").unwrap();
+    assert!(matches!(
+        hours.stages.as_slice(),
+        [Stage::Window(d)] if *d == Duration::from_secs(3600)
+    ));
     assert_eq!(
         minutes.stages.as_slice(),
         [Stage::Window(Duration::from_secs(300))]
