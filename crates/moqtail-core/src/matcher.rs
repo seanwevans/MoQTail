@@ -67,7 +67,11 @@ impl Matcher {
     }
 
     pub fn matches(&self, msg: &Message) -> bool {
-        let segments: Vec<&str> = msg.topic.split('/').collect();
+        let segments: Vec<&str> = if msg.topic.is_empty() {
+            Vec::new()
+        } else {
+            msg.topic.split('/').collect()
+        };
         Self::match_steps(&self.selector.steps, &segments, msg)
     }
 
@@ -285,12 +289,17 @@ impl Matcher {
                     Some(v) => v.as_ref(),
                     None => return false,
                 };
-                if let Ok(num) = hv.parse::<f64>() {
-                    Value::Number(num)
-                } else if hv == "true" || hv == "false" {
-                    Value::Bool(hv == "true")
-                } else {
-                    Value::Str(hv.to_string())
+                match &pred.value {
+                    Value::Number(_) => match hv.parse::<f64>() {
+                        Ok(num) => Value::Number(num),
+                        Err(_) => return false,
+                    },
+                    Value::Bool(_) => match hv {
+                        "true" => Value::Bool(true),
+                        "false" => Value::Bool(false),
+                        _ => return false,
+                    },
+                    Value::Str(_) => Value::Str(hv.to_string()),
                 }
             }
             Field::Json(ref path) => {
