@@ -85,13 +85,14 @@ fn sum_pipeline_large_unsigned() {
     let mut m = Matcher::new(sel);
 
     let headers = HashMap::new();
+    let start = Instant::now();
 
     let msg = Message {
         topic: "sensor",
         headers,
         payload: Some(json!({"value": u64::MAX})),
     };
-    assert_eq!(m.process(&msg, Instant::now()), Some(u64::MAX as f64));
+    assert_eq!(m.process(&msg, start), Some(u64::MAX as f64));
 }
 
 #[test]

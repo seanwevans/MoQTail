@@ -187,6 +187,13 @@ fn parse_stage(pair: pest::iterators::Pair<Rule>) -> Result<Stage, Error> {
     match name {
         "window" => {
             let a = arg.ok_or(Error::WindowRequiresDuration)?;
+            let duration_text = a.as_str().trim();
+            if duration_text.len() < 2 {
+                return Err(Error::WindowRequiresDuration);
+            }
+            let (value, unit) = duration_text.split_at(duration_text.len() - 1);
+            let num = value.parse::<u64>()?;
+            let seconds = match unit {
             if a.as_rule() != Rule::duration {
                 return Err(Error::WindowRequiresDuration);
             }
