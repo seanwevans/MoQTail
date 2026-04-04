@@ -11,8 +11,8 @@ MoQTail is a free, open‑source extension layer that lets publishers and subscr
 
 | Problem with vanilla MQTT | How MoQTail helps |
 | --- | --- |
-| Topic filters have only two wildcards (`+`, `#`). Complex hierarchies become unwieldy. | `/building[wing="E" and floor>3]//sensor[@type='temp']` — expressive, readable selectors. |
-| Brokers can’t route on message metadata (retained flag, QoS, properties). | Predicate axes over headers & properties: `/msg[retained=true and qos<=1]`. |
+| Topic filters have only two wildcards (`+`, `#`). Complex hierarchies become unwieldy. | `/building[wing="E"][floor>3]//sensor[type="temp"]` — expressive, readable selectors. |
+| Brokers can’t route on message metadata (retained flag, QoS, properties). | Predicate axes over headers & properties: `/msg[retained=true][qos<=1]`. |
 | Payload‑aware routing requires an external pipeline. | Dual‑phase selector lets the broker peek into JSON / CBOR / ProtoBuf payload fields. |
 | Edge analytics needs separate tooling (Node‑RED/NiFi). | Built‑in functional pipeline |
 
@@ -43,7 +43,7 @@ MoQTail keeps MQTT’s 2‑byte fixed header intact — **zero protocol bloat** 
 $ cargo install moqtail-cli
 
 # 2. Subscribe to high‑temperature alerts
-$ moqtail sub "//sensor[@type='temp'][json$.value > 30]"
+$ moqtail sub "//sensor[type=\"temp\"][json$.value>30]"
 
 # Use a different broker address
 $ moqtail sub --host broker.example.com --port 1884 "//sensor"
@@ -60,7 +60,18 @@ $ moqtail sub --dry-run "//sensor"
 $ moqtail sub "/msg[qos<=1][retained=true]//sensor"
 
 # Match JSON field status
-$ moqtail sub "//device[json$.status='online']"
+$ moqtail sub "//device[json$.status=\"online\"]"
+```
+
+### Currently supported syntax
+
+Current selector parsing in `moqtail_core::compile` supports simple predicates with
+`[field operator value]` syntax, repeated predicates for conjunction, and JSON fields
+prefixed with `json$`.
+
+```text
+/msg[qos<=1][retained=true]
+/device[json$.status="online"]
 ```
 
 
