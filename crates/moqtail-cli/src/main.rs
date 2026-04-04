@@ -85,7 +85,7 @@ pub(crate) fn run_sub(cmd: SubArgs) -> Result<(), String> {
 
     let (client, mut connection) = Client::new(mqttoptions, 10);
     if let Err(e) = client.subscribe(selector.to_string(), QoS::AtMostOnce) {
-        return Err(format!("Connection error: {e}"));
+        return Err(connection_error(e, cmd.password.as_deref()));
     }
     for event in connection.iter() {
         match event {
@@ -93,10 +93,22 @@ pub(crate) fn run_sub(cmd: SubArgs) -> Result<(), String> {
                 println!("{}: {}", p.topic, String::from_utf8_lossy(&p.payload));
             }
             Ok(_) => {}
-            Err(e) => return Err(format!("Connection error: {e}")),
+            Err(e) => return Err(connection_error(e, cmd.password.as_deref())),
         }
     }
     Ok(())
+}
+
+fn connection_error(error: impl std::fmt::Display, password: Option<&str>) -> String {
+    let raw = format!("Connection error: {error}");
+    redact_password(&raw, password)
+}
+
+fn redact_password(message: &str, password: Option<&str>) -> String {
+    match password {
+        Some(password) if !password.is_empty() => message.replace(password, "[REDACTED]"),
+        _ => message.to_string(),
+    }
 }
 
 fn main() {
@@ -134,9 +146,7 @@ mod tests {
             tls: false,
         };
         let opts = opts_from(cmd);
-        let dbg = format!("{:?}", opts);
-        assert!(dbg.contains("user"));
-        assert!(dbg.contains("pass"));
+        assert_eq!(opts.credentials(), Some(("user".to_owned(), "pass".to_owned())));
     }
 
     #[test]
@@ -151,8 +161,8 @@ mod tests {
             #[cfg(feature = "tls")]
             tls: false,
         };
-        let dbg = format!("{:?}", opts_from(cmd));
-        assert!(dbg.contains("user"));
+        let opts = opts_from(cmd);
+        assert_eq!(opts.credentials(), Some(("user".to_owned(), "".to_owned())));
 
         let cmd = SubArgs {
             query: "/foo".into(),
@@ -164,8 +174,19 @@ mod tests {
             #[cfg(feature = "tls")]
             tls: false,
         };
-        let dbg = format!("{:?}", opts_from(cmd));
-        assert!(dbg.contains("pass"));
+        let opts = opts_from(cmd);
+        assert_eq!(opts.credentials(), Some(("".to_owned(), "pass".to_owned())));
+    }
+
+    #[test]
+    fn connection_errors_redact_password() {
+        let password = "super-secret";
+        let err = connection_error(
+            format!("auth failed for password={password} at broker"),
+            Some(password),
+        );
+        assert!(err.contains("[REDACTED]"));
+        assert!(!err.contains(password));
     }
 
     #[cfg(feature = "tls")]
