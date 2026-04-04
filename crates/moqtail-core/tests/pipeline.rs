@@ -85,7 +85,6 @@ fn sum_pipeline_large_unsigned() {
     let mut m = Matcher::new(sel);
 
     let headers = HashMap::new();
-    let start = Instant::now();
 
     let msg = Message {
         topic: "sensor",
@@ -140,37 +139,33 @@ fn sum_missing_field() {
 }
 
 #[test]
-fn window_minutes_and_hours_parse() {
-    let minutes = compile("/sensor |> window(5m)").unwrap();
+fn window_parses_seconds_minutes_and_hours() {
+    let seconds = compile("/sensor |> window(5s)").unwrap();
+    assert_eq!(
+        seconds.stages.as_slice(),
+        &[Stage::Window(Duration::from_secs(5))]
+    );
+
+    let minutes = compile("/sensor |> window(2m)").unwrap();
     assert_eq!(
         minutes.stages.as_slice(),
-        &[Stage::Window(Duration::from_secs(300))]
+        &[Stage::Window(Duration::from_secs(120))]
     );
 
     let hours = compile("/sensor |> window(1h)").unwrap();
     assert_eq!(
         hours.stages.as_slice(),
         &[Stage::Window(Duration::from_secs(3600))]
-    assert!(matches!(
-        minutes.stages.as_slice(),
-        [Stage::Window(d)] if *d == Duration::from_secs(300)
-    ));
-
-    let hours = compile("/sensor |> window(1h)").unwrap();
-    assert!(matches!(
-        hours.stages.as_slice(),
-        [Stage::Window(d)] if *d == Duration::from_secs(3600)
-    ));
-    assert_eq!(
-        minutes.stages.as_slice(),
-        [Stage::Window(Duration::from_secs(300))]
     );
+}
 
-    let hours = compile("/sensor |> window(1h)").unwrap();
-    assert_eq!(
-        hours.stages.as_slice(),
-        [Stage::Window(Duration::from_secs(3600))]
-    );
+#[test]
+fn window_rejects_malformed_unit_and_missing_argument() {
+    assert!(compile("/sensor |> window(5x)").is_err());
+    assert!(matches!(
+        compile("/sensor |> window()"),
+        Err(moqtail_core::Error::WindowRequiresDuration)
+    ));
 }
 
 #[test]

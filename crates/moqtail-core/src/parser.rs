@@ -190,42 +190,27 @@ fn parse_stage(pair: pest::iterators::Pair<Rule>) -> Result<Stage, Error> {
             if a.as_rule() != Rule::duration {
                 return Err(Error::WindowRequiresDuration);
             }
-            let text = a.as_str();
-            if text.len() < 2 {
+            let mut duration_parts = a.into_inner();
+            let value = duration_parts.next().ok_or(Error::WindowRequiresDuration)?;
+            let unit = duration_parts.next().ok_or(Error::WindowRequiresDuration)?;
+            if value.as_rule() != Rule::number || unit.as_rule() != Rule::unit {
                 return Err(Error::WindowRequiresDuration);
             }
-            let (num_part, unit_part) = text.split_at(text.len() - 1);
-            let num = num_part.parse::<u64>()?;
-            let seconds = match unit_part {
-            let duration_text = a.as_str().trim();
-            if duration_text.len() < 2 {
+            if duration_parts.next().is_some() {
                 return Err(Error::WindowRequiresDuration);
             }
-            let (value, unit) = duration_text.split_at(duration_text.len() - 1);
-            let num = value.parse::<u64>()?;
-            let seconds = match unit {
-            if a.as_rule() != Rule::duration {
-                return Err(Error::WindowRequiresDuration);
-            }
-            let mut ai = a.into_inner();
-            let num_pair = ai.next().ok_or(Error::WindowRequiresDuration)?;
-            if num_pair.as_rule() != Rule::number {
-                return Err(Error::WindowRequiresDuration);
-            }
-            let num = num_pair.as_str().parse::<u64>()?;
-            let unit_pair = ai.next().ok_or(Error::WindowRequiresDuration)?;
-            if unit_pair.as_rule() != Rule::unit {
-                return Err(Error::WindowRequiresDuration);
-            }
-            let seconds = match unit_pair.as_str() {
-                "s" => num,
-                "m" => num.checked_mul(60).ok_or(Error::WindowRequiresDuration)?,
-                "h" => num.checked_mul(3600).ok_or(Error::WindowRequiresDuration)?,
+
+            let amount = value.as_str().parse::<u64>()?;
+            let seconds = match unit.as_str() {
+                "s" => amount,
+                "m" => amount
+                    .checked_mul(60)
+                    .ok_or(Error::WindowRequiresDuration)?,
+                "h" => amount
+                    .checked_mul(3600)
+                    .ok_or(Error::WindowRequiresDuration)?,
                 _ => return Err(Error::WindowRequiresDuration),
             };
-            if ai.next().is_some() {
-                return Err(Error::WindowRequiresDuration);
-            }
             Ok(Stage::Window(Duration::from_secs(seconds)))
         }
         "sum" => {
