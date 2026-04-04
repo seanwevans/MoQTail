@@ -3,7 +3,10 @@ use moqtail_core::compile;
 #[cfg(feature = "tls")]
 use rumqttc::Transport;
 use rumqttc::{Client, Event, Incoming, MqttOptions, QoS};
+use std::process;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 #[cfg(test)]
 use std::cell::RefCell;
@@ -42,10 +45,30 @@ struct SubArgs {
     /// Password for authentication
     #[arg(long)]
     password: Option<String>,
+    /// MQTT client ID (auto-generated if omitted)
+    #[arg(long)]
+    client_id: Option<String>,
     /// Use TLS for the connection
     #[cfg(feature = "tls")]
     #[arg(long)]
     tls: bool,
+}
+
+static CLIENT_ID_COUNTER: AtomicU64 = AtomicU64::new(0);
+
+fn resolve_client_id(cmd: &SubArgs) -> String {
+    if let Some(client_id) = &cmd.client_id {
+        return client_id.clone();
+    }
+
+    let pid = process::id();
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_nanos())
+        .unwrap_or(0);
+    let counter = CLIENT_ID_COUNTER.fetch_add(1, Ordering::Relaxed);
+
+    format!("moqtail-cli-{pid}-{nanos:x}-{counter:x}")
 }
 
 #[cfg(test)]
@@ -57,7 +80,7 @@ pub(crate) fn run_sub(cmd: SubArgs) -> Result<(), String> {
     let selector = compile(&cmd.query).map_err(|e| format!("Failed to compile selector: {e}"))?;
     println!("{selector}");
 
-    let mut mqttoptions = MqttOptions::new("moqtail-cli", cmd.host, cmd.port);
+    let mut mqttoptions = MqttOptions::new(resolve_client_id(&cmd), cmd.host, cmd.port);
     mqttoptions.set_keep_alive(Duration::from_secs(5));
     match (cmd.username, cmd.password) {
         (Some(u), Some(p)) => {
@@ -130,6 +153,7 @@ mod tests {
             dry_run: true,
             username: Some("user".into()),
             password: Some("pass".into()),
+            client_id: None,
             #[cfg(feature = "tls")]
             tls: false,
         };
@@ -148,6 +172,7 @@ mod tests {
             dry_run: true,
             username: Some("user".into()),
             password: None,
+            client_id: None,
             #[cfg(feature = "tls")]
             tls: false,
         };
@@ -161,6 +186,7 @@ mod tests {
             dry_run: true,
             username: None,
             password: Some("pass".into()),
+            client_id: None,
             #[cfg(feature = "tls")]
             tls: false,
         };
@@ -178,9 +204,45 @@ mod tests {
             dry_run: true,
             username: None,
             password: None,
+            client_id: None,
             tls: true,
         };
         let transport = opts_from(cmd).transport();
         assert!(matches!(transport, rumqttc::Transport::Tls(_)));
+    }
+
+    #[test]
+    fn uses_explicit_client_id() {
+        let client_id = "test-client-id-123";
+        let cmd = SubArgs {
+            query: "/foo".into(),
+            host: "localhost".into(),
+            port: 1883,
+            dry_run: true,
+            username: None,
+            password: None,
+            client_id: Some(client_id.into()),
+            #[cfg(feature = "tls")]
+            tls: false,
+        };
+        let opts = opts_from(cmd);
+        assert_eq!(opts.client_id(), client_id);
+    }
+
+    #[test]
+    fn generates_default_client_id() {
+        let cmd = SubArgs {
+            query: "/foo".into(),
+            host: "localhost".into(),
+            port: 1883,
+            dry_run: true,
+            username: None,
+            password: None,
+            client_id: None,
+            #[cfg(feature = "tls")]
+            tls: false,
+        };
+        let opts = opts_from(cmd);
+        assert!(opts.client_id().starts_with("moqtail-cli-"));
     }
 }

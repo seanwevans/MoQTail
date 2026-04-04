@@ -57,3 +57,21 @@ fn sub_accepts_single_credential_flags() {
         .arg("--dry-run");
     cmd.assert().success().stdout(contains("/foo"));
 }
+
+#[test]
+fn sub_accepts_explicit_client_id_flag() {
+    let mut cmd = Command::cargo_bin("moqtail-cli").unwrap();
+    cmd.arg("sub")
+        .arg("/foo")
+        .arg("--client-id")
+        .arg("cli-test-client-id")
+        .arg("--dry-run");
+    cmd.assert().success().stdout(contains("/foo"));
+}
+
+#[test]
+fn sub_works_with_default_generated_client_id() {
+    let mut cmd = Command::cargo_bin("moqtail-cli").unwrap();
+    cmd.arg("sub").arg("/foo").arg("--dry-run");
+    cmd.assert().success().stdout(contains("/foo"));
+}
