@@ -5,7 +5,8 @@ use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::time::{Duration, Instant};
 
-const FLOAT_TOLERANCE: f64 = f64::EPSILON;
+const ABS_EPS: f64 = 1e-12;
+const REL_EPS: f64 = 1e-9;
 
 pub struct Message<'a> {
     pub topic: &'a str,
@@ -363,7 +364,10 @@ impl Matcher {
             };
         }
 
-        let eq = float_cmp::approx_eq!(f64, l, r, epsilon = FLOAT_TOLERANCE);
+        let diff = (l - r).abs();
+        let scale = l.abs().max(r.abs());
+        let tol = ABS_EPS.max(REL_EPS * scale);
+        let eq = diff <= tol;
         let ord = l.total_cmp(&r);
         match op {
             Operator::Eq => eq,
@@ -457,23 +461,41 @@ mod tests {
     }
 
     #[test]
-    fn numbers_within_epsilon_are_equal() {
-        let l = Value::Number(1.0);
-        let r = Value::Number(1.0 + FLOAT_TOLERANCE / 2.0);
+    fn small_magnitude_values_use_absolute_tolerance() {
+        let l = Value::Number(1e-13);
+        let r = Value::Number(9e-13);
         assert!(Matcher::compare_values(&l, &r, Operator::Eq));
     }
 
     #[test]
-    fn numbers_outside_epsilon_are_not_equal() {
+    fn large_magnitude_values_use_relative_tolerance() {
+        let l = Value::Number(1_000_000_000.0);
+        let r = Value::Number(1_000_000_000.5);
+        assert!(Matcher::compare_values(&l, &r, Operator::Eq));
+    }
+
+    #[test]
+    fn relative_tolerance_boundary_remains_equal() {
+        let l = Value::Number(2_000_000_000.0);
+        let r = Value::Number(2_000_000_002.0);
+        assert!(Matcher::compare_values(&l, &r, Operator::Eq));
+    }
+
+    #[test]
+    fn values_outside_hybrid_tolerance_are_not_equal() {
         let l = Value::Number(1.0);
-        let r = Value::Number(1.0 + FLOAT_TOLERANCE * 2.0);
+        let r = Value::Number(1.0 + ABS_EPS * 4.0);
         assert!(!Matcher::compare_values(&l, &r, Operator::Eq));
+
+        let l_large = Value::Number(1_000_000_000.0);
+        let r_large = Value::Number(1_000_000_002.0);
+        assert!(!Matcher::compare_values(&l_large, &r_large, Operator::Eq));
     }
 
     #[test]
     fn ordering_within_tolerance_is_equal() {
-        let l = Value::Number(1.0);
-        let r = Value::Number(1.0 + FLOAT_TOLERANCE / 2.0);
+        let l = Value::Number(1_000_000_000.0);
+        let r = Value::Number(1_000_000_000.5);
         assert!(!Matcher::compare_values(&l, &r, Operator::Lt));
         assert!(Matcher::compare_values(&l, &r, Operator::Le));
         assert!(!Matcher::compare_values(&r, &l, Operator::Gt));
@@ -482,8 +504,8 @@ mod tests {
 
     #[test]
     fn ordering_outside_tolerance_respects_direction() {
-        let l = Value::Number(1.0);
-        let r = Value::Number(1.0 + FLOAT_TOLERANCE * 2.0);
+        let l = Value::Number(1_000_000_000.0);
+        let r = Value::Number(1_000_000_002.0);
         assert!(Matcher::compare_values(&l, &r, Operator::Lt));
         assert!(Matcher::compare_values(&r, &l, Operator::Gt));
     }
