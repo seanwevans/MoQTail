@@ -1,11 +1,20 @@
 use std::ffi::CString;
 use std::os::raw::{c_char, c_int, c_void};
+use std::sync::{Mutex, MutexGuard};
 extern crate moqtail_mosquitto;
 use moqtail_mosquitto::{
     mosquitto_evt_message, mosquitto_opt, mosquitto_plugin_cleanup, mosquitto_plugin_init,
 };
 
 const MOSQ_ERR_PLUGIN_DEFER: c_int = 17;
+
+static TEST_MUTEX: Mutex<()> = Mutex::new(());
+
+fn test_lock() -> MutexGuard<'static, ()> {
+    TEST_MUTEX
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+}
 
 static mut REGISTERED: Option<(
     extern "C" fn(c_int, *mut c_void, *mut c_void) -> c_int,
@@ -39,6 +48,7 @@ unsafe extern "C" fn mosquitto_callback_unregister(
 
 #[test]
 fn filter_integration() {
+    let _guard = test_lock();
     unsafe {
         let key = CString::new("selector").unwrap();
         let val = CString::new("/foo/+").unwrap();
@@ -96,6 +106,7 @@ fn filter_integration() {
 
 #[test]
 fn header_filter() {
+    let _guard = test_lock();
     unsafe {
         let key = CString::new("selector").unwrap();
         let val = CString::new("/msg[qos<=1]").unwrap();
@@ -141,7 +152,100 @@ fn header_filter() {
 }
 
 #[test]
+fn retained_header_filter_true() {
+    let _guard = test_lock();
+    unsafe {
+        let key = CString::new("selector").unwrap();
+        let val = CString::new("/msg[retained=true]").unwrap();
+        let mut opt = mosquitto_opt {
+            key: key.as_ptr() as *mut c_char,
+            value: val.as_ptr() as *mut c_char,
+        };
+        let mut userdata: *mut c_void = std::ptr::null_mut();
+
+        assert_eq!(
+            mosquitto_plugin_init(std::ptr::null_mut(), &mut userdata, &mut opt, 1),
+            0
+        );
+        let (cb, ctx) = REGISTERED.expect("callback registered");
+
+        let topic = CString::new("").unwrap();
+        let mut msg = mosquitto_evt_message {
+            future: std::ptr::null_mut(),
+            client: std::ptr::null_mut(),
+            topic: topic.as_ptr() as *mut c_char,
+            payload: std::ptr::null_mut(),
+            properties: std::ptr::null_mut(),
+            reason_string: std::ptr::null_mut(),
+            payloadlen: 0,
+            qos: 0,
+            reason_code: 0,
+            retain: true,
+            future2: [std::ptr::null_mut(); 4],
+        };
+
+        assert_eq!(cb(7, &mut msg as *mut _ as *mut c_void, ctx), 0);
+
+        msg.retain = false;
+        assert_eq!(
+            cb(7, &mut msg as *mut _ as *mut c_void, ctx),
+            MOSQ_ERR_PLUGIN_DEFER
+        );
+
+        mosquitto_plugin_cleanup(std::ptr::null_mut(), userdata, std::ptr::null_mut(), 0);
+        assert!(REGISTERED.is_none());
+    }
+}
+
+#[test]
+fn retained_header_filter_false() {
+    let _guard = test_lock();
+    unsafe {
+        let key = CString::new("selector").unwrap();
+        let val = CString::new("/msg[retained=false]").unwrap();
+        let mut opt = mosquitto_opt {
+            key: key.as_ptr() as *mut c_char,
+            value: val.as_ptr() as *mut c_char,
+        };
+        let mut userdata: *mut c_void = std::ptr::null_mut();
+
+        assert_eq!(
+            mosquitto_plugin_init(std::ptr::null_mut(), &mut userdata, &mut opt, 1),
+            0
+        );
+        let (cb, ctx) = REGISTERED.expect("callback registered");
+
+        let topic = CString::new("").unwrap();
+        let mut msg = mosquitto_evt_message {
+            future: std::ptr::null_mut(),
+            client: std::ptr::null_mut(),
+            topic: topic.as_ptr() as *mut c_char,
+            payload: std::ptr::null_mut(),
+            properties: std::ptr::null_mut(),
+            reason_string: std::ptr::null_mut(),
+            payloadlen: 0,
+            qos: 0,
+            reason_code: 0,
+            retain: false,
+            future2: [std::ptr::null_mut(); 4],
+        };
+
+        assert_eq!(cb(7, &mut msg as *mut _ as *mut c_void, ctx), 0);
+
+        msg.retain = true;
+        assert_eq!(
+            cb(7, &mut msg as *mut _ as *mut c_void, ctx),
+            MOSQ_ERR_PLUGIN_DEFER
+        );
+
+        mosquitto_plugin_cleanup(std::ptr::null_mut(), userdata, std::ptr::null_mut(), 0);
+        assert!(REGISTERED.is_none());
+    }
+}
+
+#[test]
 fn payload_filter() {
+    let _guard = test_lock();
     unsafe {
         let key = CString::new("selector").unwrap();
         let val = CString::new("/foo[json$.temp>30]").unwrap();

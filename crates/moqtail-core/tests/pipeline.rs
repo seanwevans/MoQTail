@@ -1,4 +1,4 @@
-use moqtail_core::{ast::Stage, compile, Matcher, Message};
+use moqtail_core::{ast::Stage, compile, Error, Matcher, Message};
 use serde_json::json;
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
@@ -123,6 +123,18 @@ fn count_pipeline() {
     };
     // Only the two most recent events fall in the trailing 60s window.
     assert_eq!(m.process(&msg3, start + Duration::from_secs(90)), Some(2.0));
+}
+
+#[test]
+fn count_rejects_arguments() {
+    assert!(matches!(
+        compile("/sensor |> count(json$.value)"),
+        Err(Error::CountTakesNoArguments)
+    ));
+    assert!(matches!(
+        compile("/sensor |> count(window(5s))"),
+        Err(Error::CountTakesNoArguments)
+    ));
 }
 
 #[test]
