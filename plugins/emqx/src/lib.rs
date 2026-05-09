@@ -17,8 +17,16 @@ pub struct EmqxMessage {
 type HookFn = extern "C" fn(*mut EmqxMessage, *mut c_void) -> c_int;
 
 extern "C" {
-    fn emqx_extension_register_hook(name: *const c_char, cb: Option<HookFn>, data: *mut c_void) -> c_int;
-    fn emqx_extension_unregister_hook(name: *const c_char, cb: Option<HookFn>, data: *mut c_void) -> c_int;
+    fn emqx_extension_register_hook(
+        name: *const c_char,
+        cb: Option<HookFn>,
+        data: *mut c_void,
+    ) -> c_int;
+    fn emqx_extension_unregister_hook(
+        name: *const c_char,
+        cb: Option<HookFn>,
+        data: *mut c_void,
+    ) -> c_int;
 }
 
 const MESSAGE_HOOK: &[u8] = b"message_publish\0";
@@ -28,6 +36,10 @@ pub struct PluginContext {
 }
 
 extern "C" fn on_message(msg: *mut EmqxMessage, userdata: *mut c_void) -> c_int {
+    if userdata.is_null() {
+        return 1;
+    }
+
     unsafe {
         let ctx = &*(userdata as *mut PluginContext);
         if msg.is_null() || (*msg).topic.is_null() {
@@ -53,8 +65,18 @@ extern "C" fn on_message(msg: *mut EmqxMessage, userdata: *mut c_void) -> c_int 
 
 /// Called by EMQX when the plugin is loaded.
 #[no_mangle]
-pub unsafe extern "C" fn moqtail_init(selectors: *const *const c_char, count: usize) -> *mut c_void {
-    let slice = std::slice::from_raw_parts(selectors, count);
+pub unsafe extern "C" fn moqtail_init(
+    selectors: *const *const c_char,
+    count: usize,
+) -> *mut c_void {
+    let slice = if count == 0 {
+        &[]
+    } else {
+        if selectors.is_null() {
+            return std::ptr::null_mut();
+        }
+        std::slice::from_raw_parts(selectors, count)
+    };
     let mut matchers = Vec::new();
     for &ptr in slice {
         if ptr.is_null() {
@@ -72,7 +94,11 @@ pub unsafe extern "C" fn moqtail_init(selectors: *const *const c_char, count: us
 
     let ctx = Box::new(PluginContext { matchers });
     let ctx_ptr = Box::into_raw(ctx) as *mut c_void;
-    emqx_extension_register_hook(MESSAGE_HOOK.as_ptr() as *const c_char, Some(on_message), ctx_ptr);
+    emqx_extension_register_hook(
+        MESSAGE_HOOK.as_ptr() as *const c_char,
+        Some(on_message),
+        ctx_ptr,
+    );
     ctx_ptr
 }
 
@@ -82,7 +108,11 @@ pub unsafe extern "C" fn moqtail_deinit(ctx: *mut c_void) {
     if ctx.is_null() {
         return;
     }
-    emqx_extension_unregister_hook(MESSAGE_HOOK.as_ptr() as *const c_char, Some(on_message), ctx);
+    emqx_extension_unregister_hook(
+        MESSAGE_HOOK.as_ptr() as *const c_char,
+        Some(on_message),
+        ctx,
+    );
     drop(Box::from_raw(ctx as *mut PluginContext));
 }
 
@@ -117,15 +147,45 @@ mod tests {
     }
 
     #[test]
+    fn on_message_rejects_null_userdata() {
+        let topic = CString::new("foo/bar").unwrap();
+        let mut msg = EmqxMessage {
+            topic: topic.as_ptr(),
+        };
+
+        assert_eq!(on_message(&mut msg as *mut _, std::ptr::null_mut()), 1);
+    }
+
+    #[test]
+    fn init_accepts_zero_selectors_and_rejects_missing_selectors() {
+        unsafe {
+            REGISTERED = None;
+            let ctx = moqtail_init(std::ptr::null(), 0);
+            assert!(!ctx.is_null());
+            let registered = REGISTERED;
+            assert!(registered.is_some());
+            moqtail_deinit(ctx);
+
+            REGISTERED = None;
+            let ctx = moqtail_init(std::ptr::null(), 1);
+            assert!(ctx.is_null());
+            let registered = REGISTERED;
+            assert!(registered.is_none());
+        }
+    }
+
+    #[test]
     fn filter_logic() {
         unsafe {
-            let sel = CString::new("/foo/+" ).unwrap();
+            let sel = CString::new("/foo/+").unwrap();
             let arr = [sel.as_ptr()];
             let ctx = moqtail_init(arr.as_ptr(), arr.len());
             let (cb, data) = REGISTERED.expect("hook registered");
 
             let topic1 = CString::new("foo/bar").unwrap();
-            let mut msg = EmqxMessage { topic: topic1.as_ptr() };
+            let mut msg = EmqxMessage {
+                topic: topic1.as_ptr(),
+            };
             assert_eq!(cb(&mut msg as *mut _, data), 0);
 
             let topic2 = CString::new("baz/qux").unwrap();
@@ -133,7 +193,8 @@ mod tests {
             assert_eq!(cb(&mut msg as *mut _, data), 1);
 
             moqtail_deinit(ctx);
-            assert!(REGISTERED.is_none());
+            let registered = REGISTERED;
+            assert!(registered.is_none());
         }
     }
 }
