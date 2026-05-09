@@ -16,12 +16,12 @@ pub struct Message<'a> {
 
 enum StageState {
     Window {
-        duration: Duration,
+        duration: Option<Duration>,
         values: VecDeque<(Instant, f64)>,
         sum: f64,
     },
     Counter {
-        duration: Duration,
+        duration: Option<Duration>,
         timestamps: VecDeque<Instant>,
     },
 }
@@ -41,12 +41,12 @@ fn json_path<'a>(root: &'a JsonValue, path: &[String]) -> Option<&'a JsonValue> 
 
 impl Matcher {
     pub fn new(selector: Selector) -> Self {
-        let mut window_duration = Duration::ZERO;
+        let mut window_duration = None;
         let mut stage_states = Vec::new();
         for stage in &selector.stages {
             match stage {
                 Stage::Window(duration) => {
-                    window_duration = *duration;
+                    window_duration = Some(*duration);
                 }
                 Stage::Sum(_) | Stage::Avg(_) => {
                     stage_states.push(StageState::Window {
@@ -83,9 +83,9 @@ impl Matcher {
     /// Each stage is evaluated sequentially once [`matches`](Self::matches) returns
     /// `true`. Windowing stages configure the trailing [`Duration`] used by
     /// subsequent aggregations. Aggregation stages (`sum`, `avg`, `count`) retain
-    /// timestamped samples and evict entries whose age exceeds that duration,
-    /// defaulting to a zero-length window (i.e. only the current sample) when no
-    /// window is specified. Missing fields cause processing to short-circuit with
+    /// timestamped samples and evict entries whose age exceeds that duration.
+    /// Without a configured window, aggregations are evaluated from only the
+    /// current message. Missing fields cause processing to short-circuit with
     /// `None`.
     ///
     /// `sum` and `avg` maintain running totals so they execute in `O(1)` time per
@@ -111,10 +111,20 @@ impl Matcher {
                     } = &mut self.stage_states[state_idx]
                     {
                         let v = Self::extract_field(field, msg)?;
-                        values.push_back((timestamp, v));
-                        *sum += v;
-                        *sum -= Self::prune_values(values, *duration, timestamp);
-                        result = Some(*sum);
+                        match duration {
+                            Some(duration) => {
+                                values.push_back((timestamp, v));
+                                *sum += v;
+                                *sum -= Self::prune_values(values, *duration, timestamp);
+                                result = Some(*sum);
+                            }
+                            None => {
+                                values.clear();
+                                values.push_back((timestamp, v));
+                                *sum = v;
+                                result = Some(v);
+                            }
+                        }
                     }
                     state_idx += 1;
                 }
@@ -126,15 +136,25 @@ impl Matcher {
                     } = &mut self.stage_states[state_idx]
                     {
                         let v = Self::extract_field(field, msg)?;
-                        values.push_back((timestamp, v));
-                        *sum += v;
-                        *sum -= Self::prune_values(values, *duration, timestamp);
-                        let len = values.len();
-                        result = if len == 0 {
-                            Some(0.0)
-                        } else {
-                            Some(*sum / len as f64)
-                        };
+                        match duration {
+                            Some(duration) => {
+                                values.push_back((timestamp, v));
+                                *sum += v;
+                                *sum -= Self::prune_values(values, *duration, timestamp);
+                                let len = values.len();
+                                result = if len == 0 {
+                                    Some(0.0)
+                                } else {
+                                    Some(*sum / len as f64)
+                                };
+                            }
+                            None => {
+                                values.clear();
+                                values.push_back((timestamp, v));
+                                *sum = v;
+                                result = Some(v);
+                            }
+                        }
                     }
                     state_idx += 1;
                 }
@@ -144,9 +164,18 @@ impl Matcher {
                         timestamps,
                     } = &mut self.stage_states[state_idx]
                     {
-                        timestamps.push_back(timestamp);
-                        Self::prune_timestamps(timestamps, *duration, timestamp);
-                        result = Some(timestamps.len() as f64);
+                        match duration {
+                            Some(duration) => {
+                                timestamps.push_back(timestamp);
+                                Self::prune_timestamps(timestamps, *duration, timestamp);
+                                result = Some(timestamps.len() as f64);
+                            }
+                            None => {
+                                timestamps.clear();
+                                timestamps.push_back(timestamp);
+                                result = Some(1.0);
+                            }
+                        }
                     }
                     state_idx += 1;
                 }
@@ -582,6 +611,27 @@ mod tests {
     }
 
     #[test]
+    fn process_sum_without_window_same_instant_uses_current_message_only() {
+        let sel = compile("/sensor |> sum(temp)").unwrap();
+        let mut m = Matcher::new(sel);
+        let timestamp = Instant::now();
+
+        let msg1 = Message {
+            topic: "sensor",
+            headers: HashMap::from([(Cow::Borrowed("temp"), Cow::Borrowed("10"))]),
+            payload: None,
+        };
+        assert_eq!(m.process(&msg1, timestamp), Some(10.0));
+
+        let msg2 = Message {
+            topic: "sensor",
+            headers: HashMap::from([(Cow::Borrowed("temp"), Cow::Borrowed("20"))]),
+            payload: None,
+        };
+        assert_eq!(m.process(&msg2, timestamp), Some(20.0));
+    }
+
+    #[test]
     fn process_sum_with_window() {
         let sel = compile("/sensor |> window(2s) |> sum(temp)").unwrap();
         let mut m = Matcher::new(sel);
@@ -613,6 +663,27 @@ mod tests {
     }
 
     #[test]
+    fn process_explicit_zero_duration_window_keeps_same_instant_samples() {
+        let sel = compile("/sensor |> window(0s) |> sum(temp)").unwrap();
+        let mut m = Matcher::new(sel);
+        let timestamp = Instant::now();
+
+        let msg1 = Message {
+            topic: "sensor",
+            headers: HashMap::from([(Cow::Borrowed("temp"), Cow::Borrowed("10"))]),
+            payload: None,
+        };
+        assert_eq!(m.process(&msg1, timestamp), Some(10.0));
+
+        let msg2 = Message {
+            topic: "sensor",
+            headers: HashMap::from([(Cow::Borrowed("temp"), Cow::Borrowed("20"))]),
+            payload: None,
+        };
+        assert_eq!(m.process(&msg2, timestamp), Some(30.0));
+    }
+
+    #[test]
     fn process_avg_without_window() {
         let sel = compile("/sensor |> avg(json$.value)").unwrap();
         let mut m = Matcher::new(sel);
@@ -631,6 +702,27 @@ mod tests {
             payload: Some(json!({"value": 20})),
         };
         assert_eq!(m.process(&msg2, start + Duration::from_secs(2)), Some(20.0));
+    }
+
+    #[test]
+    fn process_avg_without_window_same_instant_uses_current_message_only() {
+        let sel = compile("/sensor |> avg(temp)").unwrap();
+        let mut m = Matcher::new(sel);
+        let timestamp = Instant::now();
+
+        let msg1 = Message {
+            topic: "sensor",
+            headers: HashMap::from([(Cow::Borrowed("temp"), Cow::Borrowed("10"))]),
+            payload: None,
+        };
+        assert_eq!(m.process(&msg1, timestamp), Some(10.0));
+
+        let msg2 = Message {
+            topic: "sensor",
+            headers: HashMap::from([(Cow::Borrowed("temp"), Cow::Borrowed("20"))]),
+            payload: None,
+        };
+        assert_eq!(m.process(&msg2, timestamp), Some(20.0));
     }
 
     #[test]
@@ -682,6 +774,27 @@ mod tests {
             payload: None,
         };
         assert_eq!(m.process(&msg2, start + Duration::from_secs(1)), Some(1.0));
+    }
+
+    #[test]
+    fn process_count_without_window_same_instant_uses_current_message_only() {
+        let sel = compile("/sensor |> count()").unwrap();
+        let mut m = Matcher::new(sel);
+        let timestamp = Instant::now();
+
+        let msg1 = Message {
+            topic: "sensor",
+            headers: HashMap::new(),
+            payload: None,
+        };
+        assert_eq!(m.process(&msg1, timestamp), Some(1.0));
+
+        let msg2 = Message {
+            topic: "sensor",
+            headers: HashMap::new(),
+            payload: None,
+        };
+        assert_eq!(m.process(&msg2, timestamp), Some(1.0));
     }
 
     #[test]
