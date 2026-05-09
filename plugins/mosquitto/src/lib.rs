@@ -46,6 +46,10 @@ extern "C" fn on_message(_: c_int, event_data: *mut c_void, userdata: *mut c_voi
 
         let mut headers = HashMap::new();
         headers.insert(Cow::Borrowed("qos"), Cow::Owned(msg.qos.to_string()));
+        headers.insert(
+            Cow::Borrowed("retained"),
+            Cow::Borrowed(if msg.retain { "true" } else { "false" }),
+        );
 
         let payload = if !msg.payload.is_null() && msg.payloadlen > 0 {
             let bytes = slice::from_raw_parts(msg.payload as *const u8, msg.payloadlen as usize);
