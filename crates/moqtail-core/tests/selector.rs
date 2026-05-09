@@ -1,5 +1,5 @@
 use moqtail_core::{
-    ast::{Axis, Field, Operator, Predicate, Segment, Selector, Step, Value},
+    ast::{Axis, Field, Operator, Predicate, Segment, Selector, Stage, Step, Value},
     compile, Error,
 };
 
@@ -155,4 +155,18 @@ fn parse_negative_fractional_number() {
 fn error_on_malformed_json_prefix() {
     let err = compile("/foo[json.temp>30]").unwrap_err();
     assert!(matches!(err, Error::MissingField));
+}
+
+#[test]
+fn selector_display_keeps_count_parentheses() {
+    let sel = Selector {
+        steps: vec![Step {
+            axis: Axis::Child,
+            segment: Segment::Literal("sensor".into()),
+            predicates: vec![],
+        }],
+        stages: vec![Stage::Count],
+    };
+
+    assert_eq!(sel.to_string(), "/sensor |> count()");
 }
