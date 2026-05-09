@@ -99,15 +99,28 @@ pub unsafe extern "C" fn mosquitto_plugin_init(
 
     let ctx = Box::new(PluginContext { matchers });
     let ctx_ptr = Box::into_raw(ctx) as *mut c_void;
-    *userdata = ctx_ptr;
 
-    mosquitto_callback_register(
+    let rc = mosquitto_callback_register(
         identifier as *mut mosquitto_plugin_id_t,
         MOSQ_EVT_MESSAGE,
         Some(on_message),
         std::ptr::null(),
         ctx_ptr,
-    )
+    );
+
+    if rc != MOSQ_ERR_SUCCESS {
+        drop(Box::from_raw(ctx_ptr as *mut PluginContext));
+        if !userdata.is_null() {
+            *userdata = std::ptr::null_mut();
+        }
+        return rc;
+    }
+
+    if !userdata.is_null() {
+        *userdata = ctx_ptr;
+    }
+
+    rc
 }
 
 /// Called when the plugin is unloaded.
@@ -135,6 +148,11 @@ mod tests {
     use super::*;
     use std::ffi::CString;
     use std::os::raw::c_char;
+    use std::sync::atomic::{AtomicI32, Ordering};
+    use std::sync::Mutex;
+
+    static TEST_LOCK: Mutex<()> = Mutex::new(());
+    static REGISTER_RESULT: AtomicI32 = AtomicI32::new(MOSQ_ERR_SUCCESS);
 
     #[no_mangle]
     pub static mut REGISTERED: Option<(
@@ -150,10 +168,13 @@ mod tests {
         _event_data: *const c_void,
         userdata: *mut c_void,
     ) -> c_int {
-        if let Some(f) = cb_func {
-            REGISTERED = Some((f, userdata));
+        let rc = REGISTER_RESULT.load(Ordering::SeqCst);
+        if rc == MOSQ_ERR_SUCCESS {
+            if let Some(f) = cb_func {
+                REGISTERED = Some((f, userdata));
+            }
         }
-        MOSQ_ERR_SUCCESS
+        rc
     }
 
     #[no_mangle]
@@ -168,7 +189,33 @@ mod tests {
     }
 
     #[test]
+    fn init_clears_userdata_when_callback_registration_fails() {
+        let _guard = TEST_LOCK.lock().unwrap();
+        REGISTER_RESULT.store(MOSQ_ERR_PLUGIN_DEFER, Ordering::SeqCst);
+        unsafe {
+            REGISTERED = None;
+            let key = CString::new("selector").unwrap();
+            let val = CString::new("/foo/+").unwrap();
+            let mut opt = mosquitto_opt {
+                key: key.as_ptr() as *mut c_char,
+                value: val.as_ptr() as *mut c_char,
+            };
+            let mut userdata = std::ptr::dangling_mut::<c_void>();
+
+            assert_eq!(
+                mosquitto_plugin_init(std::ptr::null_mut(), &mut userdata, &mut opt, 1),
+                MOSQ_ERR_PLUGIN_DEFER
+            );
+            assert!(userdata.is_null());
+            assert!(matches!(REGISTERED, None));
+        }
+        REGISTER_RESULT.store(MOSQ_ERR_SUCCESS, Ordering::SeqCst);
+    }
+
+    #[test]
     fn filter_logic() {
+        let _guard = TEST_LOCK.lock().unwrap();
+        REGISTER_RESULT.store(MOSQ_ERR_SUCCESS, Ordering::SeqCst);
         unsafe {
             let key = CString::new("selector").unwrap();
             let val = CString::new("/foo/+").unwrap();
@@ -223,7 +270,7 @@ mod tests {
             );
 
             mosquitto_plugin_cleanup(std::ptr::null_mut(), userdata, std::ptr::null_mut(), 0);
-            assert!(REGISTERED.is_none());
+            assert!(matches!(REGISTERED, None));
         }
     }
 }
