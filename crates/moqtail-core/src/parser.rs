@@ -45,6 +45,8 @@ pub enum Error {
     SumRequiresField,
     #[error("avg requires field")]
     AvgRequiresField,
+    #[error("count takes no arguments")]
+    CountTakesNoArguments,
     #[error("unknown function {0}")]
     UnknownFunction(String),
 }
@@ -229,7 +231,12 @@ fn parse_stage(pair: pest::iterators::Pair<Rule>) -> Result<Stage, Error> {
             let field_inner = a.into_inner().next().ok_or(Error::AvgRequiresField)?;
             Ok(Stage::Avg(parse_field(field_inner)?))
         }
-        "count" => Ok(Stage::Count),
+        "count" => {
+            if arg.is_some() {
+                return Err(Error::CountTakesNoArguments);
+            }
+            Ok(Stage::Count)
+        }
         _ => Err(Error::UnknownFunction(name.to_string())),
     }
 }
