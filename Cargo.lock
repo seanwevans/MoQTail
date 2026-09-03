@@ -685,11 +685,19 @@ dependencies = [
 name = "moqtail-core"
 version = "0.1.0"
 dependencies = [
+ "ciborium",
  "criterion",
  "pest",
  "pest_derive",
  "serde_json",
  "thiserror 1.0.69",
+]
+
+[[package]]
+name = "moqtail-emqx"
+version = "0.0.0"
+dependencies = [
+ "moqtail-core",
 ]
 
 [[package]]
@@ -699,6 +707,15 @@ dependencies = [
  "moqtail-core",
  "napi",
  "napi-derive",
+]
+
+[[package]]
+name = "moqtail-mosquitto"
+version = "0.0.0"
+dependencies = [
+ "cc",
+ "moqtail-core",
+ "serde_json",
 ]
 
 [[package]]

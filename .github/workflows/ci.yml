@@ -38,10 +38,19 @@ jobs:
         run: cargo fmt --check
 
       - name: Clippy check
-        run: cargo clippy --workspace --exclude moqtail-python -- -D warnings
+        run: cargo clippy --workspace -- -D warnings
 
       - name: Run tests
-        run: cargo test --workspace --exclude moqtail-python
+        run: cargo test --workspace
+
+      # The plugin cdylibs deliberately leave the broker's own symbols
+      # undefined and resolve them when the broker dlopen()s the library. Only
+      # the ELF linker tolerates that, so the link step is Linux-only; clippy
+      # and the test binaries above cover the plugin sources on all three
+      # runners because neither links the cdylib.
+      - name: Build broker plugins
+        if: runner.os == 'Linux'
+        run: cargo build -p moqtail-mosquitto -p moqtail-emqx
 
       # Keeps the crates.io metadata honest: this is the same packaging step
       # the release workflow runs, so a manifest that would fail `cargo publish`
@@ -56,7 +65,7 @@ jobs:
 
       - name: Generate coverage
         if: runner.os == 'Linux'
-        run: cargo llvm-cov --workspace --exclude moqtail-python --lcov --output-path lcov.info
+        run: cargo llvm-cov --workspace --lcov --output-path lcov.info
 
       - name: Upload coverage artifact
         if: runner.os == 'Linux'
