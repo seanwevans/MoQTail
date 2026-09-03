@@ -8,7 +8,7 @@ description = "MoQTail selector filtering as an EMQX extension"
 
 [lib]
 path = "src/lib.rs"
-crate-type = ["cdylib"]
+crate-type = ["rlib"]
 
 
 [dependencies]

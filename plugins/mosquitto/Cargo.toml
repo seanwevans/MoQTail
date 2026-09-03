@@ -8,7 +8,7 @@ description = "MoQTail selector filtering as a Mosquitto loadable module"
 
 [lib]
 path = "src/lib.rs"
-crate-type = ["cdylib", "rlib"]
+crate-type = ["rlib"]
 
 
 [dependencies]
