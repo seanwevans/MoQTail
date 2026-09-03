@@ -694,12 +694,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "moqtail-emqx"
+version = "0.0.0"
+dependencies = [
+ "moqtail-core",
+]
+
+[[package]]
 name = "moqtail-js"
 version = "0.1.0"
 dependencies = [
  "moqtail-core",
  "napi",
  "napi-derive",
+]
+
+[[package]]
+name = "moqtail-mosquitto"
+version = "0.0.0"
+dependencies = [
+ "cc",
+ "moqtail-core",
+ "serde_json",
 ]
 
 [[package]]
