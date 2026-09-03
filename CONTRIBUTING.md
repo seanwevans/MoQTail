@@ -10,12 +10,16 @@ This guide explains the project layout, coding standards, and pull‑request wor
 
 ## 1. How the Repository is Organised
 
-| Path                   | What lives here                          | Language    |
-| ---------------------- | ---------------------------------------- | ----------- |
-| `crates/moqtail-core/` | DSL parser, AST, matcher engine          | Rust        |
-| `crates/moqtail-cli/`  | Reference CLI (`moqtail sub`)            | Rust        |
-| `plugins/`             | Broker plugins (Mosquitto, EMQX, HiveMQ) | Rust/C/Java |
-| `docs/`                | mdBook user guide & DSL reference        | Markdown    |
+| Path                   | What lives here                       | Language    |
+| ---------------------- | ------------------------------------- | ----------- |
+| `crates/moqtail-core/` | DSL parser, AST, matcher engine       | Rust        |
+| `crates/moqtail-cli/`  | Reference CLI (`moqtail sub`)         | Rust        |
+| `plugins/mosquitto/`   | Mosquitto loadable module             | Rust/C      |
+| `plugins/emqx/`        | EMQX extension                        | Rust        |
+| `bindings/js/`         | Node bindings (`moqtail-js`)          | Rust/JS     |
+| `bindings/python/`     | Python bindings (`moqtail-python`)    | Rust/Python |
+| `xtask/`               | Repository automation (`cargo xtask`) | Rust        |
+| `docs/`                | mdBook user guide & DSL reference     | Markdown    |
 
 > **Tip:** Run `cargo xtask repo-graph` to visualise crate dependencies (requires `cargo‑hack`).
 >

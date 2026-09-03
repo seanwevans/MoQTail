@@ -26,12 +26,19 @@ MoQTail keeps MQTT’s 2‑byte fixed header intact — **zero protocol bloat** 
 2. **Minimal overhead** – The query grammar is compiled once and cached; runtime matching adds O(1) per message in common cases.
 3. **Modular architecture** – Separate crates / packages:
 
-   * `moqtail-core` – DSL parser, AST, matcher engine
-   * **Broker plugins** – adapters for Mosquitto and EMQX under `plugins/`
-     * `moqtail-cli` – *tail -f* style command‑line client
-    * `moqtail-js` / `moqtail-py` – thin client helpers for web & Python apps
-      * JavaScript bindings are gated behind the `js-bindings` Cargo feature and are not
-        built by default. Enable them with `cargo build -p moqtail-js --features js-bindings`.
+   | Path | Crate | What it is |
+   | --- | --- | --- |
+   | `crates/moqtail-core/` | `moqtail-core` | DSL parser, AST, matcher engine |
+   | `crates/moqtail-cli/` | `moqtail-cli` | *tail -f* style command-line client |
+   | `plugins/mosquitto/` | `moqtail-mosquitto` | Mosquitto loadable module |
+   | `plugins/emqx/` | `moqtail-emqx` | EMQX extension |
+   | `bindings/js/` | `moqtail-js` | Thin client helper for web apps |
+   | `bindings/python/` | `moqtail-python` (imported as `moqtail_py`) | Thin client helper for Python apps |
+
+   JavaScript bindings are gated behind the `js-bindings` Cargo feature and are
+   not built by default. Enable them with
+   `cargo build -p moqtail-js --features js-bindings`.
+
 4. **FOSS‑friendly** – Dual‑licensed under MIT / Apache 2.0 to play nicely with both hobby and commercial adopters.
 
 ---
