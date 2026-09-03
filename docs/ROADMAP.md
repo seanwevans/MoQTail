@@ -27,6 +27,9 @@ MoQTail’s development is organised into four milestone releases plus an initia
 * **Namespace & branding**
 
   * Secure `moqtail` on GitHub, crates.io, npm, Docker Hub.
+    * On crates.io the bare `moqtail` name belongs to an unrelated
+      Media-over-QUIC library, so the crates are published under the
+      `moqtail-core` / `moqtail-cli` names instead.
   * Register `moqtail.dev` (and `.io` if budget permits).
 * **Governance**
 

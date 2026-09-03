@@ -18,4 +18,4 @@ extension-module = ["pyo3/extension-module"]
 
 [dependencies]
 pyo3 = "0.21"
-moqtail-core = { path = "../../crates/moqtail-core" }
+moqtail-core = { version = "0.1.0", path = "../../crates/moqtail-core" }

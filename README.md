@@ -20,6 +20,21 @@ MoQTail keeps MQTT’s 2‑byte fixed header intact — **zero protocol bloat** 
 
 ---
 
+## Using the library
+
+`moqtail-core` is the selector engine on its own — parser, AST and matcher, with
+no MQTT client and no I/O:
+
+```toml
+[dependencies]
+moqtail-core = "0.1"
+```
+
+See [`crates/moqtail-core/README.md`](crates/moqtail-core/README.md) for a
+worked example.
+
+---
+
 ## Key Design Principles
 
 1. **Backwards‑compatible** – A MoQTail‑aware client talks to any MQTT 3.1.1/5.0 broker. A legacy client can still subscribe to raw topics.
@@ -39,8 +54,8 @@ MoQTail keeps MQTT’s 2‑byte fixed header intact — **zero protocol bloat** 
 ## Quick Start (work‑in‑progress)
 
 ```bash
-# 1. Install CLI (placeholder — crates.io / PyPI coming soon)
-$ cargo install moqtail-cli
+# 1. Install the CLI. It is not on crates.io yet, so install from git:
+$ cargo install --git https://github.com/seanwevans/MoQTail moqtail-cli
 
 # 2. Subscribe to high‑temperature alerts
 $ moqtail sub "//sensor[type=\"temp\"][json$.value>30]"
