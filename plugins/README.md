@@ -38,17 +38,21 @@ compiles a small C shim through the `cc` crate) but no broker headers: the FFI
 declarations are checked in, and the broker's own symbols stay undefined until
 it `dlopen()`s the library.
 
+Both crates declare `crate-type = ["rlib"]`, so an ordinary build or test never
+links a shared library. Ask for the loadable artifact explicitly:
+
 ```bash
-$ cargo build -p moqtail-mosquitto -p moqtail-emqx --release
+$ cargo rustc -p moqtail-mosquitto --release --crate-type cdylib
+$ cargo rustc -p moqtail-emqx --release --crate-type cdylib
 ```
 
 That leaves `libmoqtail_mosquitto.so` and `libmoqtail_emqx.so` in the workspace's
 `target/release/`.
 
 Leaving the broker's symbols undefined is only tolerated by the ELF linker, so
-the link step works on Linux. macOS and Windows still compile and test the
-plugin sources — neither `cargo clippy` nor the test binaries link the cdylib —
-but cannot produce the shared library.
+that step works on Linux. macOS and Windows still compile, lint and test the
+plugin sources — nothing there links the cdylib — but cannot produce the shared
+library.
 
 ## Testing
 

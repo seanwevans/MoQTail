@@ -14,15 +14,16 @@ plugin calls are declared in `src/lib.rs` and stay undefined until EMQX
 ## Building
 
 The crate is a member of the workspace in the repository root, so build it by
-package name from anywhere in the tree:
+package name from anywhere in the tree. It declares `crate-type = ["rlib"]`, so
+the loadable library is asked for explicitly:
 
 ```bash
-$ cargo build -p moqtail-emqx --release
+$ cargo rustc -p moqtail-emqx --release --crate-type cdylib
 ```
 
 That leaves `libmoqtail_emqx.so` in the workspace's `target/release/`. Because
-the broker's symbols are resolved at load time, the link step works on Linux
-and not on macOS or Windows.
+the broker's symbols are resolved at load time, that step works on Linux and
+not on macOS or Windows.
 
 ## Entry Points
 

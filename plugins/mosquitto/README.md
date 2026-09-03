@@ -13,22 +13,22 @@ crate. Mosquitto's development headers are **not** required: the handful of
 ## Building
 
 The crate is a member of the workspace in the repository root, so build it by
-package name from anywhere in the tree:
+package name from anywhere in the tree. It declares `crate-type = ["rlib"]`, so
+the loadable library is asked for explicitly:
 
 ```bash
-$ cargo build -p moqtail-mosquitto --release
+$ cargo rustc -p moqtail-mosquitto --release --crate-type cdylib
 ```
 
 The resulting `libmoqtail_mosquitto.so` lands in the workspace's
 `target/release/` and can be loaded by Mosquitto:
 
 ```bash
-$ cargo build -p moqtail-mosquitto --release
 $ sudo cp target/release/libmoqtail_mosquitto.so /usr/lib/
 ```
 
-Because the broker's symbols are left to be resolved at load time, the link
-step works on Linux and not on macOS or Windows.
+Because the broker's symbols are left to be resolved at load time, that step
+works on Linux and not on macOS or Windows.
 
 ## Example Configuration
 
