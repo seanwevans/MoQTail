@@ -4,7 +4,7 @@ version = "0.0.0"
 edition = "2021"
 publish = false
 license = "MIT OR Apache-2.0"
-description = "Placeholder crate for the EMQX plugin"
+description = "MoQTail selector filtering as an EMQX extension"
 
 [lib]
 path = "src/lib.rs"
