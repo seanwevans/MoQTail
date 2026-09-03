@@ -10,7 +10,6 @@ description = "MoQTail selector filtering as a Mosquitto loadable module"
 path = "src/lib.rs"
 crate-type = ["cdylib", "rlib"]
 
-[workspace]
 
 [dependencies]
 moqtail-core = { path = "../../crates/moqtail-core" }

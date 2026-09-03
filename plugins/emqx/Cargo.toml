@@ -10,7 +10,6 @@ description = "MoQTail selector filtering as an EMQX extension"
 path = "src/lib.rs"
 crate-type = ["cdylib"]
 
-[workspace]
 
 [dependencies]
 moqtail-core = { path = "../../crates/moqtail-core" }

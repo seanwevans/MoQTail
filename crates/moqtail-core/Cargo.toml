@@ -4,7 +4,12 @@ version = "0.1.0"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 
+[features]
+default = ["cbor"]
+cbor = ["dep:ciborium"]
+
 [dependencies]
+ciborium = { version = "0.2", optional = true }
 pest = "2"
 pest_derive = "2"
 serde_json = "1"

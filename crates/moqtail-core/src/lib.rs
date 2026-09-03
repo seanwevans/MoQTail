@@ -3,9 +3,11 @@
 pub mod ast;
 mod matcher;
 mod parser;
+pub mod payload;
 
 pub use matcher::{Matcher, Message};
 pub use parser::{compile, Error};
+pub use payload::PayloadError;
 
 #[cfg(test)]
 mod tests {
