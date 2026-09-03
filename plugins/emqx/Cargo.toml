@@ -8,7 +8,7 @@ description = "Placeholder crate for the EMQX plugin"
 
 [lib]
 path = "src/lib.rs"
-crate-type = ["cdylib"]
+crate-type = ["rlib"]
 
 
 [dependencies]

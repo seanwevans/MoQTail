@@ -8,7 +8,7 @@ description = "Placeholder crate for the Mosquitto plugin"
 
 [lib]
 path = "src/lib.rs"
-crate-type = ["cdylib", "rlib"]
+crate-type = ["rlib"]
 
 
 [dependencies]
