@@ -81,6 +81,15 @@ extern "C" fn on_message(_: c_int, event_data: *mut c_void, userdata: *mut c_voi
 // Generated bindings provide `mosquitto_opt`
 
 /// Called when the plugin is loaded.
+///
+/// # Safety
+///
+/// Mosquitto must pass a valid `userdata` out-pointer and, when `option_count`
+/// is greater than zero, `options` must point to `option_count` initialised
+/// [`mosquitto_opt`] values whose `key`/`value` members are either null or
+/// NUL-terminated C strings. On success the plugin writes an owned context
+/// pointer to `*userdata` which must be handed back to
+/// [`mosquitto_plugin_cleanup`] exactly once.
 #[no_mangle]
 pub unsafe extern "C" fn mosquitto_plugin_init(
     identifier: *mut c_void,
@@ -143,6 +152,12 @@ pub unsafe extern "C" fn mosquitto_plugin_init(
 }
 
 /// Called when the plugin is unloaded.
+///
+/// # Safety
+///
+/// `userdata` must be either null or the pointer previously produced by
+/// [`mosquitto_plugin_init`], not yet passed to this function. The pointer is
+/// consumed and must not be used afterwards.
 #[no_mangle]
 pub unsafe extern "C" fn mosquitto_plugin_cleanup(
     identifier: *mut c_void,
@@ -178,7 +193,6 @@ mod tests {
         extern "C" fn(c_int, *mut c_void, *mut c_void) -> c_int,
         *mut c_void,
     )> = None;
-    pub static mut REGISTER_RC: c_int = MOSQ_ERR_SUCCESS;
 
     #[no_mangle]
     unsafe extern "C" fn mosquitto_callback_register(
@@ -227,10 +241,15 @@ mod tests {
                 MOSQ_ERR_PLUGIN_DEFER
             );
             assert!(userdata.is_null());
-            assert!(matches!(REGISTERED, None));
+            let registered = REGISTERED;
+            assert!(registered.is_none());
         }
         REGISTER_RESULT.store(MOSQ_ERR_SUCCESS, Ordering::SeqCst);
+    }
+
+    #[test]
     fn on_message_rejects_null_callback_data() {
+        let _guard = TEST_LOCK.lock().unwrap();
         let topic = CString::new("foo/bar").unwrap();
         let mut msg = mosquitto_evt_message {
             future: std::ptr::null_mut(),
@@ -269,9 +288,10 @@ mod tests {
 
     #[test]
     fn init_accepts_zero_options_and_rejects_invalid_inputs() {
+        let _guard = TEST_LOCK.lock().unwrap();
+        REGISTER_RESULT.store(MOSQ_ERR_SUCCESS, Ordering::SeqCst);
         unsafe {
             REGISTERED = None;
-            REGISTER_RC = MOSQ_ERR_SUCCESS;
             let mut userdata: *mut c_void = std::ptr::null_mut();
 
             assert_eq!(
@@ -310,9 +330,10 @@ mod tests {
 
     #[test]
     fn init_does_not_write_userdata_when_registration_fails() {
+        let _guard = TEST_LOCK.lock().unwrap();
+        REGISTER_RESULT.store(MOSQ_ERR_PLUGIN_DEFER, Ordering::SeqCst);
         unsafe {
             REGISTERED = None;
-            REGISTER_RC = MOSQ_ERR_PLUGIN_DEFER;
             let mut userdata: *mut c_void = std::ptr::null_mut();
 
             assert_eq!(
@@ -322,9 +343,8 @@ mod tests {
             assert!(userdata.is_null());
             let registered = REGISTERED;
             assert!(registered.is_none());
-
-            REGISTER_RC = MOSQ_ERR_SUCCESS;
         }
+        REGISTER_RESULT.store(MOSQ_ERR_SUCCESS, Ordering::SeqCst);
     }
 
     #[test]
@@ -332,7 +352,6 @@ mod tests {
         let _guard = TEST_LOCK.lock().unwrap();
         REGISTER_RESULT.store(MOSQ_ERR_SUCCESS, Ordering::SeqCst);
         unsafe {
-            REGISTER_RC = MOSQ_ERR_SUCCESS;
             let key = CString::new("selector").unwrap();
             let val = CString::new("/foo/+").unwrap();
             let mut opt = mosquitto_opt {
@@ -386,7 +405,8 @@ mod tests {
             );
 
             mosquitto_plugin_cleanup(std::ptr::null_mut(), userdata, std::ptr::null_mut(), 0);
-            assert!(matches!(REGISTERED, None));
+            let registered = REGISTERED;
+            assert!(registered.is_none());
         }
     }
 }

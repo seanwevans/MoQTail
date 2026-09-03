@@ -5,6 +5,8 @@ members = [
     "crates/moqtail-cli",
     "bindings/python",
     "bindings/js",
+    "plugins/mosquitto",
+    "plugins/emqx",
 ]
 default-members = [
     "xtask",

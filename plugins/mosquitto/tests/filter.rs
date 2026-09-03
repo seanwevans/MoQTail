@@ -100,7 +100,8 @@ fn filter_integration() {
         );
 
         mosquitto_plugin_cleanup(std::ptr::null_mut(), userdata, std::ptr::null_mut(), 0);
-        assert!(REGISTERED.is_none());
+        let registered = REGISTERED;
+        assert!(registered.is_none());
     }
 }
 
@@ -147,7 +148,8 @@ fn header_filter() {
         );
 
         mosquitto_plugin_cleanup(std::ptr::null_mut(), userdata, std::ptr::null_mut(), 0);
-        assert!(REGISTERED.is_none());
+        let registered = REGISTERED;
+        assert!(registered.is_none());
     }
 }
 
@@ -193,7 +195,8 @@ fn retained_header_filter_true() {
         );
 
         mosquitto_plugin_cleanup(std::ptr::null_mut(), userdata, std::ptr::null_mut(), 0);
-        assert!(REGISTERED.is_none());
+        let registered = REGISTERED;
+        assert!(registered.is_none());
     }
 }
 
@@ -239,7 +242,8 @@ fn retained_header_filter_false() {
         );
 
         mosquitto_plugin_cleanup(std::ptr::null_mut(), userdata, std::ptr::null_mut(), 0);
-        assert!(REGISTERED.is_none());
+        let registered = REGISTERED;
+        assert!(registered.is_none());
     }
 }
 
@@ -288,6 +292,7 @@ fn payload_filter() {
         );
 
         mosquitto_plugin_cleanup(std::ptr::null_mut(), userdata, std::ptr::null_mut(), 0);
-        assert!(REGISTERED.is_none());
+        let registered = REGISTERED;
+        assert!(registered.is_none());
     }
 }

@@ -64,6 +64,13 @@ extern "C" fn on_message(msg: *mut EmqxMessage, userdata: *mut c_void) -> c_int 
 }
 
 /// Called by EMQX when the plugin is loaded.
+///
+/// # Safety
+///
+/// When `count` is greater than zero, `selectors` must point to `count`
+/// readable pointers, each of which is either null or a NUL-terminated C
+/// string. The returned pointer owns the plugin context and must be released
+/// with [`moqtail_deinit`] exactly once.
 #[no_mangle]
 pub unsafe extern "C" fn moqtail_init(
     selectors: *const *const c_char,
@@ -103,6 +110,12 @@ pub unsafe extern "C" fn moqtail_init(
 }
 
 /// Called when EMQX unloads the plugin.
+///
+/// # Safety
+///
+/// `ctx` must be either null or the pointer previously returned by
+/// [`moqtail_init`], not yet passed to this function. The pointer is consumed
+/// and must not be used afterwards.
 #[no_mangle]
 pub unsafe extern "C" fn moqtail_deinit(ctx: *mut c_void) {
     if ctx.is_null() {
