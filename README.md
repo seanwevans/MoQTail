@@ -13,7 +13,7 @@ MoQTail is a free, open‑source extension layer that lets publishers and subscr
 | --- | --- |
 | Topic filters have only two wildcards (`+`, `#`). Complex hierarchies become unwieldy. | `/building[wing="E"][floor>3]//sensor[type="temp"]` — expressive, readable selectors. |
 | Brokers can’t route on message metadata (retained flag, QoS, properties). | Predicate axes over headers & properties: `/msg[retained=true][qos<=1]`. |
-| Payload‑aware routing requires an external pipeline. | Dual‑phase selector lets the broker peek into JSON / CBOR / ProtoBuf payload fields. |
+| Payload‑aware routing requires an external pipeline. | Dual‑phase selector lets the broker peek into JSON and CBOR payload fields. |
 | Edge analytics needs separate tooling (Node‑RED/NiFi). | Built‑in functional pipeline |
 
 MoQTail keeps MQTT’s 2‑byte fixed header intact — **zero protocol bloat** — but adds a powerful, broker‑side query engine that low‑power clients can opt into with a single subscription string.
@@ -66,13 +66,25 @@ $ moqtail sub "//device[json$.status=\"online\"]"
 ### Currently supported syntax
 
 Current selector parsing in `moqtail_core::compile` supports simple predicates with
-`[field operator value]` syntax, repeated predicates for conjunction, and JSON fields
-prefixed with `json$`.
+`[field operator value]` syntax, repeated predicates for conjunction, and payload
+fields prefixed with `json$`.
 
 ```text
 /msg[qos<=1][retained=true]
 /device[json$.status="online"]
 ```
+
+### Payload formats
+
+`json$` names a path into the message payload, whatever encoding it arrived in.
+`moqtail_core::payload` decodes the bytes into the engine's value tree, so the
+same predicates apply to every supported format:
+
+| Format | Status |
+| --- | --- |
+| JSON | Supported — `payload::from_json`. |
+| CBOR (RFC 8949) | Supported — `payload::from_cbor`, behind the default-on `cbor` Cargo feature. Integer map keys are addressable by their decimal form. |
+| Protobuf | Not implemented. It needs schema plumbing the engine does not have yet; tracked as a post‑1.0 item in [`docs/ROADMAP.md`](docs/ROADMAP.md). |
 
 
 > **Note:** The DSL and tooling are still in early design. Expect syntax tweaks!

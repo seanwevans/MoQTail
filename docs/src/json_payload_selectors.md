@@ -16,4 +16,6 @@ You can combine multiple expressions:
 $ moqtail sub "//sensor[json$.value > 30][json$.unit='C']"
 ```
 
-The payload must be valid UTF‑8 JSON for these predicates to apply.
+The payload must be valid UTF‑8 JSON for these predicates to apply. The same
+predicates work over CBOR payloads — see [CBOR Payload
+Selectors](cbor_payload_selectors.md).
