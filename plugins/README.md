@@ -22,19 +22,48 @@ The layout is intentionally similar across brokers:
 2. **`src/`** – Plugin entry points and any shim code bridging to the broker SDK.
 3. **`build.rs`** (optional) – Generates FFI bindings or performs extra steps.
 
-Each plugin is versioned independently but shares the core crates via the
-workspace in the repository root (coming in later milestones).
+Both plugins are members of the workspace in the repository root, so they share
+its `Cargo.lock` and its `moqtail-core` build, and `cargo clippy --workspace` /
+`cargo test --workspace` cover them. They are kept out of `default-members`,
+so a bare `cargo build` at the root does not build them.
 
-> **Note:** The plugins are currently placeholders pending the v0.2 milestone.
-> Expect breaking changes as the APIs stabilise.
+> **Note:** The plugins are early and their FFI surface is not stable. The
+> broker plugin work is tracked under v0.3 in
+> [`docs/ROADMAP.md`](../docs/ROADMAP.md); expect breaking changes until then.
 
-## Building the Mosquitto plugin
+## Building
 
-Compile the shared library using Cargo:
+Building the shared libraries needs a working C toolchain (the Mosquitto crate
+compiles a small C shim through the `cc` crate) but no broker headers: the FFI
+declarations are checked in, and the broker's own symbols stay undefined until
+it `dlopen()`s the library.
+
+Both crates declare `crate-type = ["rlib"]`, so an ordinary build or test never
+links a shared library. Ask for the loadable artifact explicitly:
 
 ```bash
-$ cargo build -p moqtail-mosquitto --release
+$ cargo rustc -p moqtail-mosquitto --release --crate-type cdylib
+$ cargo rustc -p moqtail-emqx --release --crate-type cdylib
 ```
 
-The resulting `libmoqtail_mosquitto.so` in `target/release/` can then be loaded
-by Mosquitto as a plugin.
+That leaves `libmoqtail_mosquitto.so` and `libmoqtail_emqx.so` in the workspace's
+`target/release/`.
+
+Leaving the broker's symbols undefined is only tolerated by the ELF linker, so
+that step works on Linux. macOS and Windows still compile, lint and test the
+plugin sources — nothing there links the cdylib — but cannot produce the shared
+library.
+
+## Testing
+
+```bash
+$ cargo test -p moqtail-mosquitto -p moqtail-emqx
+```
+
+The tests stub the broker's registration entry points, so they exercise the real
+plugin callbacks without a broker running.
+
+See each plugin's own README for configuration and installation:
+
+* [`mosquitto/README.md`](mosquitto/README.md)
+* [`emqx/README.md`](emqx/README.md)
