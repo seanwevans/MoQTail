@@ -3,6 +3,13 @@ name = "moqtail-core"
 version = "0.1.0"
 edition = "2021"
 license = "MIT OR Apache-2.0"
+description = "XPath-inspired selector engine for MQTT: DSL parser, AST and matcher"
+repository = "https://github.com/seanwevans/MoQTail"
+homepage = "https://github.com/seanwevans/MoQTail"
+documentation = "https://docs.rs/moqtail-core"
+readme = "README.md"
+keywords = ["mqtt", "selector", "query", "iot", "xpath"]
+categories = ["network-programming", "parser-implementations"]
 
 [dependencies]
 pest = "2"

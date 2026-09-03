@@ -9,7 +9,7 @@ default = ["tls"]
 tls = ["rumqttc/use-rustls"]
 
 [dependencies]
-moqtail-core = { path = "../moqtail-core" }
+moqtail-core = { version = "0.1.0", path = "../moqtail-core" }
 rumqttc = { version = "0.24", default-features = false }
 
 [dependencies.clap]

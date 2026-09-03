@@ -1,4 +1,8 @@
-//! Core library for MoQtail
+//! Core library for MoQTail.
+//!
+//! The crate README is included below so its examples are compiled by
+//! `cargo test`.
+#![doc = include_str!("../README.md")]
 
 pub mod ast;
 mod matcher;

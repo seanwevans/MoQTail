@@ -9,7 +9,7 @@ crate-type = ["cdylib"]
 required-features = ["js-bindings"]
 
 [dependencies]
-moqtail-core = { path = "../../crates/moqtail-core" }
+moqtail-core = { version = "0.1.0", path = "../../crates/moqtail-core" }
 napi = { version = "2", features = ["napi6"] }
 napi-derive = "2"
 

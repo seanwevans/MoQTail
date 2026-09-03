@@ -43,6 +43,13 @@ jobs:
       - name: Run tests
         run: cargo test --workspace --exclude moqtail-python
 
+      # Keeps the crates.io metadata honest: this is the same packaging step
+      # the release workflow runs, so a manifest that would fail `cargo publish`
+      # fails here instead, on the pull request that broke it.
+      - name: Check moqtail-core packages
+        if: runner.os == 'Linux'
+        run: cargo package -p moqtail-core --locked
+
       - name: Install cargo-llvm-cov
         if: runner.os == 'Linux'
         run: cargo install cargo-llvm-cov --locked
