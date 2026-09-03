@@ -73,7 +73,7 @@ fn resolve_client_id(cmd: &SubArgs) -> String {
 
 #[cfg(test)]
 thread_local! {
-    pub static TEST_OPTIONS: RefCell<Option<MqttOptions>> = RefCell::new(None);
+    pub static TEST_OPTIONS: RefCell<Option<MqttOptions>> = const { RefCell::new(None) };
 }
 
 pub(crate) fn run_sub(cmd: SubArgs) -> Result<(), String> {
@@ -82,7 +82,7 @@ pub(crate) fn run_sub(cmd: SubArgs) -> Result<(), String> {
 
     let mut mqttoptions = MqttOptions::new(resolve_client_id(&cmd), cmd.host, cmd.port);
     mqttoptions.set_keep_alive(Duration::from_secs(5));
-    match (cmd.username, cmd.password) {
+    match (cmd.username.as_deref(), cmd.password.as_deref()) {
         (Some(u), Some(p)) => {
             mqttoptions.set_credentials(u, p);
         }
@@ -170,7 +170,10 @@ mod tests {
             tls: false,
         };
         let opts = opts_from(cmd);
-        assert_eq!(opts.credentials(), Some(("user".to_owned(), "pass".to_owned())));
+        assert_eq!(
+            opts.credentials(),
+            Some(("user".to_owned(), "pass".to_owned()))
+        );
     }
 
     #[test]
