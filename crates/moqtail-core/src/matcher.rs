@@ -512,9 +512,15 @@ mod tests {
 
     #[test]
     fn values_outside_hybrid_tolerance_are_not_equal() {
-        let l = Value::Number(1.0);
-        let r = Value::Number(1.0 + ABS_EPS * 4.0);
+        // The absolute floor only dominates near zero; at any other scale the
+        // relative term decides, so the gap has to clear `REL_EPS * scale`.
+        let l = Value::Number(0.0);
+        let r = Value::Number(ABS_EPS * 4.0);
         assert!(!Matcher::compare_values(&l, &r, Operator::Eq));
+
+        let l_unit = Value::Number(1.0);
+        let r_unit = Value::Number(1.0 + REL_EPS * 4.0);
+        assert!(!Matcher::compare_values(&l_unit, &r_unit, Operator::Eq));
 
         let l_large = Value::Number(1_000_000_000.0);
         let r_large = Value::Number(1_000_000_002.0);
