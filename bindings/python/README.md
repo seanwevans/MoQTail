@@ -25,3 +25,17 @@ This package exposes a thin wrapper around `moqtail-core` using [PyO3](https://p
 
 This will compile the Rust code and make the `moqtail_py` module available in
 your current Python environment.
+
+## The `extension-module` feature
+
+`pyo3/extension-module` is behind an off-by-default Cargo feature. With it on,
+the CPython symbols are left for the importing interpreter to resolve, which is
+what a wheel needs but makes a `cargo test` binary unlinkable. `pyproject.toml`
+turns it on, so `maturin` builds are unaffected; leaving it off by default is
+what lets `cargo clippy`, `cargo test` and coverage cover this crate in CI.
+
+To build the module by hand, ask for it explicitly:
+
+```bash
+$ cargo build -p moqtail-python --features extension-module
+```

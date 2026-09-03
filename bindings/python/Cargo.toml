@@ -6,8 +6,16 @@ license = "MIT OR Apache-2.0"
 
 [lib]
 name = "moqtail_py"
-crate-type = ["cdylib"]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+# `pyo3/extension-module` leaves the CPython symbols to be resolved by the
+# interpreter that imports the module. That is what a wheel wants, but it makes
+# a `cargo test` binary unlinkable, which is why this crate used to be excluded
+# from CI. Keep it off by default so clippy, tests and coverage can build the
+# crate, and let maturin turn it on for the wheel.
+extension-module = ["pyo3/extension-module"]
 
 [dependencies]
-pyo3 = { version = "0.21", features = ["extension-module"] }
+pyo3 = "0.21"
 moqtail-core = { path = "../../crates/moqtail-core" }
