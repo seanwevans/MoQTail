@@ -43,14 +43,17 @@ jobs:
       - name: Run tests
         run: cargo test --workspace
 
-      # The plugin cdylibs deliberately leave the broker's own symbols
-      # undefined and resolve them when the broker dlopen()s the library. Only
-      # the ELF linker tolerates that, so the link step is Linux-only; clippy
-      # and the test binaries above cover the plugin sources on all three
-      # runners because neither links the cdylib.
+      # The plugins declare `crate-type = ["rlib"]` so that clippy and the test
+      # binaries above cover their sources on all three runners without anyone
+      # linking a shared library. The loadable artifact is asked for explicitly
+      # here, and only on Linux: it deliberately leaves the broker's own symbols
+      # undefined until the broker dlopen()s it, which the Mach-O and PE linkers
+      # reject.
       - name: Build broker plugins
         if: runner.os == 'Linux'
-        run: cargo build -p moqtail-mosquitto -p moqtail-emqx
+        run: |
+          cargo rustc -p moqtail-mosquitto --crate-type cdylib
+          cargo rustc -p moqtail-emqx --crate-type cdylib
 
       - name: Install cargo-llvm-cov
         if: runner.os == 'Linux'
