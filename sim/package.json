@@ -1,0 +1,10 @@
+{
+  "name": "moqtail-sim",
+  "private": true,
+  "type": "module",
+  "description": "Static MoQTail cruise-ship simulator; tests run with node --test.",
+  "scripts": {
+    "test": "node --test",
+    "serve": "python3 -m http.server 8080"
+  }
+}

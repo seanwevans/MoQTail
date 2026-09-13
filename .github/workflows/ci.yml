@@ -76,3 +76,19 @@ jobs:
         with:
           name: coverage
           path: lcov.info
+
+  # The simulator ships a browser port of the selector engine. It runs the same
+  # golden corpus as `cargo test -p moqtail-core --test conformance`, so a
+  # change to one engine that the other does not follow fails here.
+  simulator:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Test the browser engine and the ship model
+        working-directory: sim
+        run: node --test

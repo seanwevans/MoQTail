@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MoQTail Simulator — MS Tail Spinner</title>
+<meta name="description" content="An interactive cruise-ship telemetry fabric — 204 nodes, 53 fieldbuses, 22 hubs — filtered live by MoQTail selectors.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>🛳️</text></svg>">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="mark">MoQTail</span>
+    <span class="sub">MS <em>Tail&nbsp;Spinner</em> · shipboard telemetry fabric</span>
+  </div>
+
+  <div class="voyage" id="voyage">
+    <span class="chip" id="v-clock">--:--</span>
+    <span class="chip" id="v-phase">—</span>
+    <span class="chip" id="v-sea">—</span>
+    <span class="chip" id="v-sog">—</span>
+    <span class="chip mono" id="v-pos">—</span>
+  </div>
+
+  <div class="kpis">
+    <div class="kpi"><b id="k-nodes">—</b><span>nodes</span></div>
+    <div class="kpi"><b id="k-buses">—</b><span>buses</span></div>
+    <div class="kpi"><b id="k-hubs">—</b><span>hubs</span></div>
+    <div class="kpi"><b id="k-rate">—</b><span>msg/s at broker</span></div>
+    <div class="kpi accent"><b id="k-matched">—</b><span>msg/s matched</span></div>
+  </div>
+</header>
+
+<main>
+  <section class="stage panel">
+    <div class="stage-head">
+      <h2>Deck elevation · buses → hubs → trunk risers → core broker</h2>
+      <div class="stage-tools">
+        <button id="btn-play" class="btn" title="Play / pause (space)">⏸ Pause</button>
+        <label class="speed">speed
+          <input id="speed" type="range" min="0.25" max="4" step="0.25" value="1">
+          <b id="speed-val">1.0×</b>
+        </label>
+        <button id="btn-labels" class="btn ghost" title="Toggle deck names">Labels</button>
+      </div>
+    </div>
+    <div class="canvas-wrap">
+      <canvas id="ship"></canvas>
+      <div id="tooltip" class="tooltip" hidden></div>
+    </div>
+    <div class="legend" id="legend"></div>
+    <div class="scenarios">
+      <span class="scenarios-label">Inject</span>
+      <div id="incident-buttons" class="incident-buttons"></div>
+      <button id="btn-clear" class="btn ghost">Clear all</button>
+    </div>
+  </section>
+
+  <aside class="side">
+    <section class="panel console">
+      <h2>Subscription <span class="hint">— a MoQTail selector, compiled in your browser</span></h2>
+      <div class="editor">
+        <textarea id="selector" rows="2" spellcheck="false" autocomplete="off"
+          aria-label="MoQTail selector"></textarea>
+        <div id="selector-status" class="status"></div>
+      </div>
+      <div id="selector-hint" class="suffix-hint" hidden></div>
+
+      <div class="ast" id="ast"></div>
+
+      <div class="presets">
+        <div class="preset-groups" id="presets"></div>
+      </div>
+
+      <details class="cheats">
+        <summary>Grammar in one screen</summary>
+        <dl>
+          <dt><code>/seg</code></dt><dd>child axis — the next topic segment</dd>
+          <dt><code>//seg</code></dt><dd>descendant axis — any depth below here</dd>
+          <dt><code>+</code> <code>#</code></dt><dd>one segment / zero or more segments</dd>
+          <dt><code>msg</code></dt><dd>the message itself; consumes no topic segment</dd>
+          <dt><code>[field op value]</code></dt><dd><code>=</code> <code>&lt;</code> <code>&gt;</code> <code>&lt;=</code> <code>&gt;=</code>, repeat to conjoin</dd>
+          <dt><code>json$.a.b</code></dt><dd>a path into the decoded payload</dd>
+          <dt><code>|&gt; window(60s)</code></dt><dd>sets the trailing window for the stages after it</dd>
+          <dt><code>|&gt; sum/avg/count</code></dt><dd>aggregate over that window</dd>
+        </dl>
+        <p class="note">The last step is anchored at the end of the topic: <code>//engine</code>
+        wants a topic <em>ending</em> in <code>engine</code>, so shipboard topics need
+        <code>//engine/+</code>.</p>
+      </details>
+    </section>
+
+    <section class="panel metrics">
+      <h2>What crosses the satellite</h2>
+      <div class="savings">
+        <div class="savings-bar">
+          <div class="bar-row">
+            <span class="bar-label">broker ingress</span>
+            <div class="bar"><i id="bar-total"></i></div>
+            <b id="val-total">—</b>
+          </div>
+          <div class="bar-row">
+            <span class="bar-label">after MoQTail</span>
+            <div class="bar"><i id="bar-matched" class="matched"></i></div>
+            <b id="val-matched">—</b>
+          </div>
+          <div class="bar-row budget">
+            <span class="bar-label">shore budget</span>
+            <div class="bar"><i id="bar-budget" class="budget"></i></div>
+            <b><input id="budget" type="range" min="32" max="2048" step="32" value="256"><span id="val-budget">256 kbps</span></b>
+          </div>
+        </div>
+        <div class="savings-headline">
+          <b id="saved-pct">—</b><span>filtered at the broker</span>
+        </div>
+      </div>
+
+      <canvas id="spark" class="spark" height="96"></canvas>
+      <div class="spark-key">
+        <span><i class="sw total"></i>broker ingress</span>
+        <span><i class="sw matched"></i>matched</span>
+        <span class="right" id="spark-scale">—</span>
+      </div>
+
+      <div id="stage-box" class="stage-box" hidden>
+        <div class="stage-head-row"><span id="stage-label">—</span><b id="stage-value">—</b></div>
+        <canvas id="stage-spark" height="54"></canvas>
+      </div>
+
+      <h3>Where the matches are</h3>
+      <div id="breakdown" class="breakdown"></div>
+    </section>
+  </aside>
+</main>
+
+<section class="lower">
+  <section class="panel links">
+    <h2>Congested links <span class="hint">— offered load ÷ capacity</span></h2>
+    <div class="table-wrap"><table id="bus-table">
+      <thead><tr><th>segment</th><th>family</th><th>where</th><th class="num">kbps</th><th class="num">cap</th><th class="num">load</th></tr></thead>
+      <tbody></tbody>
+    </table></div>
+    <h3>Hubs</h3>
+    <div class="table-wrap"><table id="hub-table">
+      <thead><tr><th>hub</th><th>deck</th><th>feeds</th><th class="num">msg/s</th><th class="num">load</th></tr></thead>
+      <tbody></tbody>
+    </table></div>
+  </section>
+
+  <section class="panel tail">
+    <h2><code>moqtail sub</code> <span class="hint">— matched messages, newest first</span></h2>
+    <div id="tail" class="tail-rows"></div>
+  </section>
+
+  <section class="panel eventlog">
+    <h2>Bridge log</h2>
+    <div id="log" class="log-rows"></div>
+  </section>
+</section>
+
+<footer>
+  <span>Built on <a href="https://github.com/seanwevans/MoQTail">moqtail-core</a> — the selector engine is a
+  browser port of the Rust crate, held to it by a shared conformance corpus.</span>
+  <span class="mono" id="fleet-facts"></span>
+</footer>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>

@@ -20,6 +20,32 @@ MoQTail keeps MQTT’s 2‑byte fixed header intact — **zero protocol bloat** 
 
 ---
 
+## Try it: the MS *Tail Spinner*
+
+**[seanwevans.github.io/MoQTail](https://seanwevans.github.io/MoQTail/)** — an
+interactive cruise ship wired for telemetry, filtered live by selectors you
+type.
+
+255 devices across 16 families sit on 68 industrial fieldbuses — KNX, Modbus,
+CANopen, NMEA 2000, LoRa — which concentrate through 29 zone hubs onto two trunk
+risers and into a broker on the bridge. The ship offers about half a megabit a
+second. The satellite link ashore is 256 kbps. Something has to give, and that
+something is a MoQTail selector:
+
+```text
+/msg[qos=2]//#                              only the safety-critical publishers
+//engine/+[json$.egt>520]                   exhaust gas over the alarm limit
+//nav/+ |> window(10s) |> avg(json$.sog)    speed over ground, smoothed
+```
+
+Inject a bilge alarm, a galley fire, a muster drill or a chiller trip and watch
+which nodes light up, which fieldbuses saturate, and how much of the ship's
+traffic your subscription actually lets through. The selector engine running in
+the page is a port of `moqtail-core`, pinned to it by a shared conformance
+corpus. See [`sim/README.md`](sim/README.md).
+
+---
+
 ## Using the library
 
 `moqtail-core` is the selector engine on its own — parser, AST and matcher, with
