@@ -4,5 +4,4 @@
 
 **/*.rs.bk
 lcov.info
-
-
+node_modules/

@@ -1,0 +1,64 @@
+---
+name: Pages
+
+'on':
+  push:
+    branches: [main]
+    paths:
+      - 'sim/**'
+      - 'crates/moqtail-core/tests/conformance/**'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+# The deploy job mints an id-token for the Pages deployment and writes to Pages
+# itself. Nothing here needs write access to the repository.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deployment at a time, and never cancel one halfway: a cancelled deploy can
+# leave the site serving a partially published version.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # The browser engine is what ships to Pages, so it is held to the same
+      # golden corpus as the Rust crate before it goes anywhere.
+      - name: Test the simulator
+        working-directory: sim
+        run: node --test
+
+      - name: Assemble the site
+        run: |
+          set -euo pipefail
+          rm -rf _site
+          mkdir -p _site
+          cp -R sim/. _site/
+          rm -rf _site/tests _site/package.json
+          test -f _site/index.html
+          test -f _site/js/moqtail.js
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

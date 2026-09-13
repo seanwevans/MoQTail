@@ -1,0 +1,207 @@
+{
+  "//": [
+    "Golden conformance corpus for the MoQTail selector engine.",
+    "",
+    "Two engines read this file: `tests/conformance.rs` runs it against",
+    "`moqtail-core`, and `sim/tests/conformance.test.mjs` runs it against the",
+    "browser port in `sim/js/moqtail.js`. A behaviour that only one of them",
+    "has is a behaviour this file catches.",
+    "",
+    "compile: `display` is asserted when present, `error` only for the failures",
+    "that come from the semantic pass (parser::Error variants other than Pest),",
+    "because pest's own diagnostics are not reproducible outside pest.",
+    "match:   a missing or null `payload` is `None`.",
+    "process: `steps` are fed in order at `at_ms` after a common base instant;",
+    "         `expect` is the value of the last stage, or null for None."
+  ],
+
+  "compile": [
+    { "selector": "/foo/bar", "ok": true, "display": "/foo/bar" },
+    { "selector": "//sensor", "ok": true, "display": "//sensor" },
+    { "selector": "/+/#", "ok": true, "display": "/+/#" },
+    { "selector": "//#/#/sensor", "ok": true, "display": "//#/#/sensor" },
+    { "selector": "/msg", "ok": true, "display": "/msg" },
+    { "selector": "/ship/deck-4/aft/refrig/rf-1", "ok": true, "display": "/ship/deck-4/aft/refrig/rf-1" },
+    { "selector": "/ship / deck4 // +", "ok": true, "display": "/ship/deck4//+" },
+    { "selector": "/msg[qos<=1][retained=true]//sensor", "ok": true, "display": "/msg[qos<=1][retained=true]//sensor" },
+    { "selector": "/device[json$.status=\"online\"]", "ok": true, "display": "/device[json$.status=\"online\"]" },
+    { "selector": "/foo[json$.a.b.c>=1.5]", "ok": true, "display": "/foo[json$.a.b.c>=1.5]" },
+    { "selector": "/msg[x=-3]", "ok": true, "display": "/msg[x=-3]" },
+    { "selector": "/msg[x=1.50]", "ok": true, "display": "/msg[x=1.5]" },
+    { "selector": "/msg[x<0.25]", "ok": true, "display": "/msg[x<0.25]" },
+    { "selector": "/a[b=\"q\\\"uote\"]", "ok": true, "display": "/a[b=\"q\\\"uote\"]" },
+    { "selector": "/a[b=\"tab\\tx\"]", "ok": true, "display": "/a[b=\"tab\\tx\"]" },
+    { "selector": "/json", "ok": true, "display": "/json" },
+    { "selector": "/a[json=1]", "ok": true, "display": "/a[json=1]" },
+    { "selector": "/a[jsonx=1]", "ok": true, "display": "/a[jsonx=1]" },
+    { "selector": "/a[b=false]", "ok": true, "display": "/a[b=false]" },
+    { "selector": "/sensor |> count()", "ok": true, "display": "/sensor |> count()" },
+    { "selector": "/sensor |> window(2s) |> avg(json$.value)", "ok": true, "display": "/sensor |> window(2s) |> avg(json$.value)" },
+    { "selector": "/sensor |> window(1m) |> sum(temp)", "ok": true, "display": "/sensor |> window(60s) |> sum(temp)" },
+    { "selector": "/sensor |> window(2h) |> count()", "ok": true, "display": "/sensor |> window(7200s) |> count()" },
+    { "selector": "/sensor|>window(0s)|>sum(temp)", "ok": true, "display": "/sensor |> window(0s) |> sum(temp)" },
+
+    { "selector": "", "ok": false },
+    { "selector": "/", "ok": false },
+    { "selector": "foo/bar", "ok": false },
+    { "selector": "/foo//", "ok": false },
+    { "selector": "/fo$", "ok": false },
+    { "selector": "/a[b=]", "ok": false },
+    { "selector": "/a[b==1]", "ok": false },
+    { "selector": "/a[b=1", "ok": false },
+    { "selector": "/sensor |>", "ok": false },
+    { "selector": "/sensor |> window(1.5s)", "ok": false },
+    { "selector": "/a[json.temp=1]", "ok": false, "error": "missing field" },
+    { "selector": "/a[json$=1]", "ok": false, "error": "missing field" },
+    { "selector": "/sensor |> sum()", "ok": false, "error": "sum requires field" },
+    { "selector": "/sensor |> avg()", "ok": false, "error": "avg requires field" },
+    { "selector": "/sensor |> sum(window(2s))", "ok": false, "error": "sum requires field" },
+    { "selector": "/sensor |> window()", "ok": false, "error": "window requires duration" },
+    { "selector": "/sensor |> window(2)", "ok": false, "error": "window requires duration" },
+    { "selector": "/sensor |> window(2x)", "ok": false, "error": "window requires duration" },
+    { "selector": "/sensor |> count(5s)", "ok": false, "error": "count takes no arguments" },
+    { "selector": "/sensor |> bogus()", "ok": false, "error": "unknown function bogus" }
+  ],
+
+  "match": [
+    { "selector": "/foo/bar", "topic": "foo/bar", "expect": true },
+    { "selector": "/foo/bar", "topic": "foo/baz", "expect": false },
+    { "selector": "/foo/bar", "topic": "foo/bar/baz", "expect": false },
+    { "selector": "/foo/+", "topic": "foo/bar", "expect": true },
+    { "selector": "/foo/+", "topic": "foo", "expect": false },
+    { "selector": "/foo/+", "topic": "foo/bar/baz", "expect": false },
+    { "selector": "/foo/#", "topic": "foo", "expect": true },
+    { "selector": "/foo/#", "topic": "foo/bar/baz", "expect": true },
+    { "selector": "/foo/#", "topic": "bar", "expect": false },
+    { "selector": "//sensor", "topic": "building/floor/sensor", "expect": true },
+    { "selector": "//sensor", "topic": "building/floor/actuator", "expect": false },
+    { "selector": "//sensor", "topic": "building/sensor/t-1", "expect": false },
+    { "selector": "//sensor/+", "topic": "building/sensor/t-1", "expect": true },
+    { "selector": "//sensor/#", "topic": "building/sensor", "expect": true },
+    { "selector": "//sensor/#", "topic": "building/sensor/t-1/raw", "expect": true },
+    { "selector": "//#/#/sensor", "topic": "a/b/c/d/e/f/g/h/sensor", "expect": true },
+    { "selector": "//#/#/sensor", "topic": "a/b/c/d/e/f/g/h/other", "expect": false },
+    { "selector": "/ship/deck2/aft/engine/+", "topic": "ship/deck2/aft/engine/me-2a", "expect": true },
+    { "selector": "/ship/deck2//+", "topic": "ship/deck2/aft/engine/me-2a", "expect": true },
+    { "selector": "/ship//engine/+", "topic": "ship/deck2/aft/engine/me-2a", "expect": true },
+    { "selector": "/ship//engine/+", "topic": "ship/deck2/aft/bilge/bg-1", "expect": false },
+
+    { "selector": "/msg/foo", "topic": "foo", "expect": true },
+    { "selector": "/msg/foo", "topic": "msg/foo", "expect": false },
+    { "selector": "/msg[qos<=1]//#", "topic": "a/b/c", "headers": { "qos": "1" }, "expect": true },
+    { "selector": "/msg[qos<=1]//#", "topic": "a/b/c", "headers": { "qos": "2" }, "expect": false },
+    { "selector": "/msg[qos<=1]//#", "topic": "a/b/c", "headers": {}, "expect": false },
+    { "selector": "/msg[retained=true]//#", "topic": "a", "headers": { "retained": "true" }, "expect": true },
+    { "selector": "/msg[retained=true]//#", "topic": "a", "headers": { "retained": "false" }, "expect": false },
+    { "selector": "/msg[retained=true]//#", "topic": "a", "headers": { "retained": "yes" }, "expect": false },
+    { "selector": "/msg[prio=\"high\"]//#", "topic": "a/b", "headers": { "prio": "high" }, "expect": true },
+    { "selector": "/msg[prio=\"high\"]//#", "topic": "a/b", "headers": { "prio": "low" }, "expect": false },
+    { "selector": "/msg[prio<\"high\"]//#", "topic": "a/b", "headers": { "prio": "high" }, "expect": false },
+    { "selector": "/msg[qos=1]//#", "topic": "a", "headers": { "qos": "not-a-number" }, "expect": false },
+    { "selector": "/msg[qos>0][qos<2]//#", "topic": "a", "headers": { "qos": "1" }, "expect": true },
+    { "selector": "/msg[qos>0][qos<2]//#", "topic": "a", "headers": { "qos": "0" }, "expect": false },
+
+    { "selector": "/foo[json$.temp>30]", "topic": "foo", "payload": { "temp": 35 }, "expect": true },
+    { "selector": "/foo[json$.temp>30]", "topic": "foo", "payload": { "temp": 25 }, "expect": false },
+    { "selector": "/foo[json$.temp>30]", "topic": "foo", "expect": false },
+    { "selector": "/foo[json$.temp>30]", "topic": "foo", "payload": { "other": 35 }, "expect": false },
+    { "selector": "/foo[json$.a.b>1]", "topic": "foo", "payload": { "a": { "b": 2 } }, "expect": true },
+    { "selector": "/foo[json$.a.b>1]", "topic": "foo", "payload": { "a": { "b": 0 } }, "expect": false },
+    { "selector": "/foo[json$.a.b>1]", "topic": "foo", "payload": { "a": [1, 2] }, "expect": false },
+    { "selector": "/foo[json$.a.0>1]", "topic": "foo", "payload": { "a": [5, 6] }, "expect": false },
+    { "selector": "/foo[json$.ok=true]", "topic": "foo", "payload": { "ok": true }, "expect": true },
+    { "selector": "/foo[json$.ok=true]", "topic": "foo", "payload": { "ok": false }, "expect": false },
+    { "selector": "/foo[json$.ok=true]", "topic": "foo", "payload": { "ok": "true" }, "expect": false },
+    { "selector": "/foo[json$.s=\"on\"]", "topic": "foo", "payload": { "s": "on" }, "expect": true },
+    { "selector": "/foo[json$.s=\"on\"]", "topic": "foo", "payload": { "s": "off" }, "expect": false },
+    { "selector": "/foo[json$.s>1]", "topic": "foo", "payload": { "s": "9" }, "expect": false },
+    { "selector": "/foo[json$.n=1]", "topic": "foo", "payload": { "n": null }, "expect": false },
+    { "selector": "/foo[json$.n=1]", "topic": "foo", "payload": { "n": { "x": 1 } }, "expect": false },
+    { "selector": "/foo[json$.n=1]", "topic": "foo", "payload": { "n": 1.0 }, "expect": true },
+
+    { "selector": "/foo[json$.v=1000000000]", "topic": "foo", "payload": { "v": 1000000000.5 }, "expect": true },
+    { "selector": "/foo[json$.v<1000000000]", "topic": "foo", "payload": { "v": 999999999.5 }, "expect": false },
+    { "selector": "/foo[json$.v<1000000000]", "topic": "foo", "payload": { "v": 999999998 }, "expect": true },
+    { "selector": "/foo[json$.v>=1000000000]", "topic": "foo", "payload": { "v": 999999999.5 }, "expect": true },
+    { "selector": "/foo[json$.v=0]", "topic": "foo", "payload": { "v": 0.000000000004 }, "expect": false },
+
+    { "selector": "/msg[qos<=1][retained=false]//pos/+", "topic": "ship/deck5/mid/pos/til-3", "headers": { "qos": "0", "retained": "false" }, "payload": { "amount": 12.5 }, "expect": true },
+    { "selector": "/msg[qos<=1][retained=false]//pos/+", "topic": "ship/deck5/mid/pos/til-3", "headers": { "qos": "2", "retained": "false" }, "payload": { "amount": 12.5 }, "expect": false },
+    { "selector": "//bilge/+[json$.mm>120]", "topic": "ship/deck1/mid/bilge/bg-4", "payload": { "mm": 180 }, "expect": true },
+    { "selector": "//bilge/+[json$.mm>120]", "topic": "ship/deck1/mid/bilge/bg-4", "payload": { "mm": 20 }, "expect": false },
+    { "selector": "//bilge/+[json$.mm>120]", "topic": "ship/deck1/mid/fuel/fu-4", "payload": { "mm": 180 }, "expect": false }
+  ],
+
+  "process": [
+    {
+      "selector": "/sensor |> sum(temp)",
+      "steps": [
+        { "at_ms": 0, "topic": "sensor", "headers": { "temp": "10" }, "expect": 10.0 },
+        { "at_ms": 1000, "topic": "sensor", "headers": { "temp": "20" }, "expect": 20.0 }
+      ]
+    },
+    {
+      "selector": "/sensor |> window(2s) |> sum(temp)",
+      "steps": [
+        { "at_ms": 0, "topic": "sensor", "headers": { "temp": "10" }, "expect": 10.0 },
+        { "at_ms": 1000, "topic": "sensor", "headers": { "temp": "20" }, "expect": 30.0 },
+        { "at_ms": 3000, "topic": "sensor", "headers": { "temp": "30" }, "expect": 50.0 },
+        { "at_ms": 6000, "topic": "sensor", "headers": { "temp": "30" }, "expect": 30.0 }
+      ]
+    },
+    {
+      "selector": "/sensor |> window(0s) |> sum(temp)",
+      "steps": [
+        { "at_ms": 0, "topic": "sensor", "headers": { "temp": "10" }, "expect": 10.0 },
+        { "at_ms": 0, "topic": "sensor", "headers": { "temp": "20" }, "expect": 30.0 }
+      ]
+    },
+    {
+      "selector": "/sensor |> window(2s) |> avg(json$.value)",
+      "steps": [
+        { "at_ms": 0, "topic": "sensor", "payload": { "value": 10 }, "expect": 10.0 },
+        { "at_ms": 1000, "topic": "sensor", "payload": { "value": 20 }, "expect": 15.0 },
+        { "at_ms": 3000, "topic": "sensor", "payload": { "value": 30 }, "expect": 25.0 },
+        { "at_ms": 6000, "topic": "sensor", "payload": { "value": 30 }, "expect": 30.0 }
+      ]
+    },
+    {
+      "selector": "/sensor |> window(2s) |> count()",
+      "steps": [
+        { "at_ms": 0, "topic": "sensor", "expect": 1.0 },
+        { "at_ms": 1000, "topic": "sensor", "expect": 2.0 },
+        { "at_ms": 3000, "topic": "sensor", "expect": 2.0 },
+        { "at_ms": 6000, "topic": "sensor", "expect": 1.0 }
+      ]
+    },
+    {
+      "selector": "/sensor |> count()",
+      "steps": [
+        { "at_ms": 0, "topic": "sensor", "expect": 1.0 },
+        { "at_ms": 1000, "topic": "sensor", "expect": 1.0 }
+      ]
+    },
+    {
+      "selector": "/other |> count()",
+      "steps": [
+        { "at_ms": 0, "topic": "sensor", "expect": null }
+      ]
+    },
+    {
+      "selector": "/sensor |> window(10s) |> sum(json$.kw)",
+      "steps": [
+        { "at_ms": 0, "topic": "sensor", "payload": { "kw": 1.5 }, "expect": 1.5 },
+        { "at_ms": 100, "topic": "sensor", "payload": { "other": 2 }, "expect": null },
+        { "at_ms": 200, "topic": "sensor", "payload": { "kw": 2.5 }, "expect": 4.0 }
+      ]
+    },
+    {
+      "selector": "/sensor |> window(60s) |> count() |> window(2s) |> count()",
+      "steps": [
+        { "at_ms": 0, "topic": "sensor", "expect": 1.0 },
+        { "at_ms": 1000, "topic": "sensor", "expect": 2.0 },
+        { "at_ms": 5000, "topic": "sensor", "expect": 1.0 }
+      ]
+    }
+  ]
+}
