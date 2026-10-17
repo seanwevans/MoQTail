@@ -69,6 +69,28 @@ pub struct Selector {
 use std::fmt;
 use std::time::Duration;
 
+impl Selector {
+    /// Every field the selector reads, from step predicates and pipeline
+    /// stages alike.
+    pub fn fields(&self) -> impl Iterator<Item = &Field> {
+        let predicates = self
+            .steps
+            .iter()
+            .flat_map(|step| step.predicates.iter().map(|p| &p.field));
+        let stages = self.stages.iter().filter_map(|stage| match stage {
+            Stage::Sum(field) | Stage::Avg(field) => Some(field),
+            Stage::Window(_) | Stage::Count => None,
+        });
+        predicates.chain(stages)
+    }
+
+    /// Whether evaluating this selector reads the message payload. When it
+    /// does not, callers can skip decoding the payload entirely.
+    pub fn needs_payload(&self) -> bool {
+        self.fields().any(|f| matches!(f, Field::Json(_)))
+    }
+}
+
 impl fmt::Display for Selector {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for step in &self.steps {

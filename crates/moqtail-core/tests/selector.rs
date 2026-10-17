@@ -170,3 +170,13 @@ fn selector_display_keeps_count_parentheses() {
 
     assert_eq!(sel.to_string(), "/sensor |> count()");
 }
+
+#[test]
+fn needs_payload_tracks_json_fields() {
+    assert!(!compile("/msg[qos<=1]/a/+").unwrap().needs_payload());
+    assert!(compile("//sensor[json$.v>1]").unwrap().needs_payload());
+    assert!(compile("/a |> avg(json$.v)").unwrap().needs_payload());
+    assert!(!compile("/a |> window(5s) |> sum(temp)")
+        .unwrap()
+        .needs_payload());
+}

@@ -48,6 +48,41 @@ pub fn from_json(bytes: &[u8]) -> Result<JsonValue, PayloadError> {
     Ok(serde_json::from_slice(bytes)?)
 }
 
+/// Decodes a payload whose encoding is not known in advance: JSON first, then
+/// (with the `cbor` feature) CBOR.
+///
+/// The CBOR attempt only succeeds when one data item spans the whole payload,
+/// so arbitrary binary or text that happens to start with a valid CBOR head is
+/// not mistaken for a value. On failure the JSON error is returned, or the
+/// CBOR error when that feature is enabled.
+///
+/// ```
+/// use moqtail_core::payload::from_bytes;
+/// assert_eq!(from_bytes(br#"{"v":1}"#).unwrap()["v"], 1);
+/// assert!(from_bytes(b"not a payload").is_err());
+/// ```
+pub fn from_bytes(bytes: &[u8]) -> Result<JsonValue, PayloadError> {
+    let json = from_json(bytes);
+    #[cfg(not(feature = "cbor"))]
+    return json;
+    #[cfg(feature = "cbor")]
+    {
+        if json.is_ok() {
+            return json;
+        }
+        let mut rest = bytes;
+        let value: ciborium::value::Value =
+            ciborium::from_reader(&mut rest).map_err(|e| PayloadError::Cbor(e.to_string()))?;
+        if !rest.is_empty() {
+            return Err(PayloadError::Cbor(format!(
+                "{} trailing bytes after the first data item",
+                rest.len()
+            )));
+        }
+        cbor_to_json(value)
+    }
+}
+
 /// Decodes a CBOR payload (RFC 8949) into the matcher's value tree, so the same
 /// `json$` predicates apply to it.
 ///
@@ -157,6 +192,16 @@ mod tests {
     #[test]
     fn malformed_json_is_an_error() {
         assert!(from_json(b"{status:}").is_err());
+    }
+
+    #[test]
+    fn from_bytes_prefers_json() {
+        assert_eq!(from_bytes(b"[1,2]").unwrap(), serde_json::json!([1, 2]));
+    }
+
+    #[test]
+    fn from_bytes_rejects_plain_text() {
+        assert!(from_bytes(b"temperature is 21C").is_err());
     }
 
     #[cfg(feature = "cbor")]
@@ -274,6 +319,22 @@ mod tests {
                 from_cbor(&bytes),
                 Err(PayloadError::UnsupportedKey)
             ));
+        }
+
+        #[test]
+        fn from_bytes_falls_back_to_cbor() {
+            let bytes = encode(Cbor::Map(vec![(
+                Cbor::Text("v".into()),
+                Cbor::Integer(7.into()),
+            )]));
+            assert_eq!(from_bytes(&bytes).unwrap()["v"], 7);
+        }
+
+        #[test]
+        fn from_bytes_rejects_cbor_with_trailing_bytes() {
+            let mut bytes = encode(Cbor::Integer(1.into()));
+            bytes.push(0x00);
+            assert!(matches!(from_bytes(&bytes), Err(PayloadError::Cbor(_))));
         }
 
         #[test]
