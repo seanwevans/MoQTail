@@ -6,7 +6,7 @@ use moqtail_mosquitto::{
     mosquitto_evt_message, mosquitto_opt, mosquitto_plugin_cleanup, mosquitto_plugin_init,
 };
 
-const MOSQ_ERR_PLUGIN_DEFER: c_int = 17;
+const MOSQ_ERR_ACL_DENIED: c_int = 12;
 
 static TEST_MUTEX: Mutex<()> = Mutex::new(());
 
@@ -89,17 +89,17 @@ fn filter_integration() {
         msg.topic = topic3.as_ptr() as *mut c_char;
         assert_eq!(
             cb(7, &mut msg as *mut _ as *mut c_void, ctx),
-            MOSQ_ERR_PLUGIN_DEFER
+            MOSQ_ERR_ACL_DENIED
         );
 
         let topic4 = CString::new("baz/qux").unwrap();
         msg.topic = topic4.as_ptr() as *mut c_char;
         assert_eq!(
             cb(7, &mut msg as *mut _ as *mut c_void, ctx),
-            MOSQ_ERR_PLUGIN_DEFER
+            MOSQ_ERR_ACL_DENIED
         );
 
-        mosquitto_plugin_cleanup(std::ptr::null_mut(), userdata, std::ptr::null_mut(), 0);
+        mosquitto_plugin_cleanup(userdata, std::ptr::null_mut(), 0);
         let registered = REGISTERED;
         assert!(registered.is_none());
     }
@@ -144,10 +144,10 @@ fn header_filter() {
         msg.qos = 2;
         assert_eq!(
             cb(7, &mut msg as *mut _ as *mut c_void, ctx),
-            MOSQ_ERR_PLUGIN_DEFER
+            MOSQ_ERR_ACL_DENIED
         );
 
-        mosquitto_plugin_cleanup(std::ptr::null_mut(), userdata, std::ptr::null_mut(), 0);
+        mosquitto_plugin_cleanup(userdata, std::ptr::null_mut(), 0);
         let registered = REGISTERED;
         assert!(registered.is_none());
     }
@@ -191,10 +191,10 @@ fn retained_header_filter_true() {
         msg.retain = false;
         assert_eq!(
             cb(7, &mut msg as *mut _ as *mut c_void, ctx),
-            MOSQ_ERR_PLUGIN_DEFER
+            MOSQ_ERR_ACL_DENIED
         );
 
-        mosquitto_plugin_cleanup(std::ptr::null_mut(), userdata, std::ptr::null_mut(), 0);
+        mosquitto_plugin_cleanup(userdata, std::ptr::null_mut(), 0);
         let registered = REGISTERED;
         assert!(registered.is_none());
     }
@@ -238,10 +238,10 @@ fn retained_header_filter_false() {
         msg.retain = true;
         assert_eq!(
             cb(7, &mut msg as *mut _ as *mut c_void, ctx),
-            MOSQ_ERR_PLUGIN_DEFER
+            MOSQ_ERR_ACL_DENIED
         );
 
-        mosquitto_plugin_cleanup(std::ptr::null_mut(), userdata, std::ptr::null_mut(), 0);
+        mosquitto_plugin_cleanup(userdata, std::ptr::null_mut(), 0);
         let registered = REGISTERED;
         assert!(registered.is_none());
     }
@@ -288,10 +288,10 @@ fn payload_filter() {
         msg.payloadlen = payload2.as_bytes().len() as u32;
         assert_eq!(
             cb(7, &mut msg as *mut _ as *mut c_void, ctx),
-            MOSQ_ERR_PLUGIN_DEFER
+            MOSQ_ERR_ACL_DENIED
         );
 
-        mosquitto_plugin_cleanup(std::ptr::null_mut(), userdata, std::ptr::null_mut(), 0);
+        mosquitto_plugin_cleanup(userdata, std::ptr::null_mut(), 0);
         let registered = REGISTERED;
         assert!(registered.is_none());
     }

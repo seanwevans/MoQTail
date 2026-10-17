@@ -70,7 +70,7 @@ fn malformed_json() {
 
         assert_eq!(cb(7, &mut msg as *mut _ as *mut c_void, ctx), 0);
 
-        mosquitto_plugin_cleanup(std::ptr::null_mut(), userdata, std::ptr::null_mut(), 0);
+        mosquitto_plugin_cleanup(userdata, std::ptr::null_mut(), 0);
         let registered = REGISTERED;
         assert!(registered.is_none());
     }
