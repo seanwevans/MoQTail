@@ -180,3 +180,69 @@ fn needs_payload_tracks_json_fields() {
         .unwrap()
         .needs_payload());
 }
+
+/// MQTT 3.1.1 section 4.7 filter matching, kept independent of the matcher.
+fn mqtt_filter_matches(filter: &str, topic: &str) -> bool {
+    let mut f = filter.split('/');
+    let mut t = topic.split('/');
+    loop {
+        match (f.next(), t.next()) {
+            (Some("#"), _) => return true,
+            (Some("+"), Some(_)) => {}
+            (Some(a), Some(b)) if a == b => {}
+            (None, None) => return true,
+            _ => return false,
+        }
+    }
+}
+
+#[test]
+fn subscription_filter_admits_everything_the_selector_matches() {
+    use moqtail_core::{Matcher, Message};
+    use std::collections::HashMap;
+
+    let mut state = 0xD1B5_4A32_D192_ED03_u64;
+    let mut next = move |n: u64| {
+        state ^= state << 13;
+        state ^= state >> 7;
+        state ^= state << 17;
+        state % n
+    };
+    let segs = ["a", "b", "+", "#", "msg"];
+    let mut matched = 0;
+    for _ in 0..30_000 {
+        let mut sel = String::new();
+        for _ in 0..1 + next(4) {
+            sel.push_str(if next(4) == 0 { "//" } else { "/" });
+            sel.push_str(segs[next(5) as usize]);
+        }
+        let selector = compile(&sel).unwrap();
+        let filter = selector.subscription_filter();
+        let matcher = Matcher::new(selector);
+        // MQTT topics are never empty.
+        let levels: Vec<&str> = (0..1 + next(4))
+            .map(|_| ["a", "b", ""][next(3) as usize])
+            .collect();
+        let topic = levels.join("/");
+        let msg = Message {
+            topic: &topic,
+            headers: HashMap::new(),
+            payload: None,
+        };
+        if matcher.matches(&msg) {
+            matched += 1;
+            assert!(
+                mqtt_filter_matches(&filter, &topic),
+                "{sel} matches {topic:?} but its filter {filter:?} does not"
+            );
+        }
+    }
+    assert!(matched > 1_000, "only {matched} matches exercised");
+}
+
+#[test]
+fn subscription_filter_is_exact_for_plain_topic_selectors() {
+    assert_eq!(compile("/a/+/b").unwrap().subscription_filter(), "a/+/b");
+    assert_eq!(compile("/a/#/b").unwrap().subscription_filter(), "a/#");
+    assert_eq!(compile("/msg[qos=1]").unwrap().subscription_filter(), "#");
+}

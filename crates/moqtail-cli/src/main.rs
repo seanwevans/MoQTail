@@ -1,11 +1,13 @@
 use clap::{Args, Parser, Subcommand};
-use moqtail_core::compile;
+use moqtail_core::{compile, payload, Matcher, Message};
 #[cfg(feature = "tls")]
 use rumqttc::Transport;
-use rumqttc::{Client, Event, Incoming, MqttOptions, QoS};
+use rumqttc::{Client, Event, Incoming, MqttOptions, Publish, QoS};
+use std::borrow::Cow;
+use std::collections::HashMap;
 use std::process;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 #[cfg(test)]
@@ -79,6 +81,10 @@ thread_local! {
 pub(crate) fn run_sub(cmd: SubArgs) -> Result<(), String> {
     let selector = compile(&cmd.query).map_err(|e| format!("Failed to compile selector: {e}"))?;
     println!("{selector}");
+    // The broker only understands plain MQTT filters, so subscribe to the
+    // narrowest one that covers the selector and evaluate the rest here.
+    let filter = selector.subscription_filter();
+    eprintln!("subscribing to MQTT filter {filter:?}");
 
     let mut mqttoptions = MqttOptions::new(resolve_client_id(&cmd), cmd.host, cmd.port);
     mqttoptions.set_keep_alive(Duration::from_secs(5));
@@ -106,20 +112,63 @@ pub(crate) fn run_sub(cmd: SubArgs) -> Result<(), String> {
         return Ok(());
     }
 
+    let mut matcher = Matcher::new(selector);
     let (client, mut connection) = Client::new(mqttoptions, 10);
-    if let Err(e) = client.subscribe(selector.to_string(), QoS::AtMostOnce) {
+    // Delivery QoS is the lower of the publish and subscription QoS, so
+    // subscribe at 2 for `qos` predicates to see what the publisher sent.
+    if let Err(e) = client.subscribe(filter, QoS::ExactlyOnce) {
         return Err(connection_error(e, cmd.password.as_deref()));
     }
     for event in connection.iter() {
         match event {
             Ok(Event::Incoming(Incoming::Publish(p))) => {
-                println!("{}: {}", p.topic, String::from_utf8_lossy(&p.payload));
+                if let Some(line) = evaluate_publish(&mut matcher, &p, Instant::now()) {
+                    println!("{line}");
+                }
             }
             Ok(_) => {}
             Err(e) => return Err(connection_error(e, cmd.password.as_deref())),
         }
     }
     Ok(())
+}
+
+/// Applies the selector to one delivered message and returns the line to print
+/// for it, if any.
+///
+/// Selectors see the delivery's `qos`, `retained` and `dup` flags and the
+/// payload decoded as JSON or CBOR. A selector with pipeline stages prints the
+/// stage result instead of the payload.
+fn evaluate_publish(matcher: &mut Matcher, p: &Publish, now: Instant) -> Option<String> {
+    let qos = match p.qos {
+        QoS::AtMostOnce => "0",
+        QoS::AtLeastOnce => "1",
+        QoS::ExactlyOnce => "2",
+    };
+    let flag = |b: bool| Cow::Borrowed(if b { "true" } else { "false" });
+    let headers = HashMap::from([
+        (Cow::Borrowed("qos"), Cow::Borrowed(qos)),
+        (Cow::Borrowed("retained"), flag(p.retain)),
+        (Cow::Borrowed("dup"), flag(p.dup)),
+    ]);
+    let mut msg = Message {
+        topic: &p.topic,
+        headers,
+        payload: None,
+    };
+    if matcher.selector().needs_payload() && matcher.may_match(&msg) {
+        msg.payload = payload::from_bytes(&p.payload).ok();
+    }
+
+    if matcher.selector().stages.is_empty() {
+        matcher
+            .matches(&msg)
+            .then(|| format!("{}: {}", p.topic, String::from_utf8_lossy(&p.payload)))
+    } else {
+        matcher
+            .process(&msg, now)
+            .map(|value| format!("{}: {value}", p.topic))
+    }
 }
 
 fn connection_error(error: impl std::fmt::Display, password: Option<&str>) -> String {
@@ -251,6 +300,52 @@ mod tests {
         };
         let opts = opts_from(cmd);
         assert_eq!(opts.client_id(), client_id);
+    }
+
+    fn publish(topic: &str, qos: QoS, retain: bool, payload: &str) -> Publish {
+        let mut p = Publish::new(topic, qos, payload.as_bytes().to_vec());
+        p.retain = retain;
+        p
+    }
+
+    fn eval(selector: &str, p: &Publish) -> Option<String> {
+        let mut matcher = Matcher::new(compile(selector).unwrap());
+        evaluate_publish(&mut matcher, p, Instant::now())
+    }
+
+    #[test]
+    fn post_filters_on_topic_headers_and_payload() {
+        let hot = publish("site/sensor", QoS::AtLeastOnce, false, r#"{"temp":35}"#);
+        let cold = publish("site/sensor", QoS::AtLeastOnce, false, r#"{"temp":25}"#);
+        assert_eq!(
+            eval("//sensor[json$.temp>30]", &hot).as_deref(),
+            Some(r#"site/sensor: {"temp":35}"#)
+        );
+        assert_eq!(eval("//sensor[json$.temp>30]", &cold), None);
+        assert_eq!(eval("/site/actuator", &hot), None);
+
+        assert!(eval("/msg[qos=1]//sensor", &hot).is_some());
+        assert!(eval("/msg[qos=2]//sensor", &hot).is_none());
+        assert!(eval("/msg[retained=false][dup=false]//sensor", &hot).is_some());
+        let retained = publish("site/sensor", QoS::AtMostOnce, true, "x");
+        assert!(eval("/msg[retained=true]//sensor", &retained).is_some());
+    }
+
+    #[test]
+    fn stages_print_their_result() {
+        let mut matcher =
+            Matcher::new(compile("//sensor |> window(10s) |> avg(json$.temp)").unwrap());
+        let start = Instant::now();
+        let first = publish("a/sensor", QoS::AtMostOnce, false, r#"{"temp":10}"#);
+        let second = publish("b/sensor", QoS::AtMostOnce, false, r#"{"temp":20}"#);
+        assert_eq!(
+            evaluate_publish(&mut matcher, &first, start).as_deref(),
+            Some("a/sensor: 10")
+        );
+        assert_eq!(
+            evaluate_publish(&mut matcher, &second, start + Duration::from_secs(1)).as_deref(),
+            Some("b/sensor: 15")
+        );
     }
 
     #[test]
