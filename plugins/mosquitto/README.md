@@ -39,7 +39,7 @@ plugin_opt_selector /foo/+
 plugin_opt_selector //sensor/#
 ```
 
-Each `plugin_opt_selector` entry is compiled using `moqtail-core`. Messages that do not match any selector are dropped before being routed to clients.
+Each `plugin_opt_selector` entry is compiled using `moqtail-core`. Messages that do not match any selector are denied (`MOSQ_ERR_ACL_DENIED`): Mosquitto drops them without disconnecting the publisher, and MQTT 5 publishers see reason code 0x87 (Not authorized) on QoS 1/2. The filter runs once per incoming PUBLISH, so it applies broker-wide, not per subscriber.
 
 Selectors that fail to compile are reported on stderr and skipped; the plugin
 still loads with whatever selectors did compile. A message whose payload is not

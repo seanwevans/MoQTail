@@ -21,10 +21,12 @@ include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 const MOSQ_EVT_MESSAGE: c_int = 7;
 const MOSQ_ERR_SUCCESS: c_int = 0;
 const MOSQ_ERR_PLUGIN_DEFER: c_int = 17;
+const MOSQ_ERR_ACL_DENIED: c_int = 12;
 
 // Use generated types `mosquitto_evt_message` and `mosquitto_opt`
 
 pub struct PluginContext {
+    identifier: *mut mosquitto_plugin_id_t,
     matchers: Vec<Matcher>,
 }
 
@@ -75,10 +77,17 @@ extern "C" fn on_message(_: c_int, event_data: *mut c_void, userdata: *mut c_voi
             }
         }
     }
-    MOSQ_ERR_PLUGIN_DEFER
+    MOSQ_ERR_ACL_DENIED
 }
 
 // Generated bindings provide `mosquitto_opt`
+
+/// Tells Mosquitto 2.x which plugin interface this library implements.
+/// Without this export the broker refuses to load the library.
+#[no_mangle]
+pub extern "C" fn mosquitto_plugin_version(_count: c_int, _versions: *const c_int) -> c_int {
+    5
+}
 
 /// Called when the plugin is loaded.
 ///
@@ -125,7 +134,10 @@ pub unsafe extern "C" fn mosquitto_plugin_init(
         }
     }
 
-    let ctx = Box::new(PluginContext { matchers });
+    let ctx = Box::new(PluginContext {
+        identifier: identifier as *mut mosquitto_plugin_id_t,
+        matchers,
+    });
     let ctx_ptr = Box::into_raw(ctx) as *mut c_void;
 
     let rc = mosquitto_callback_register(
@@ -160,19 +172,18 @@ pub unsafe extern "C" fn mosquitto_plugin_init(
 /// consumed and must not be used afterwards.
 #[no_mangle]
 pub unsafe extern "C" fn mosquitto_plugin_cleanup(
-    identifier: *mut c_void,
     userdata: *mut c_void,
     _options: *mut mosquitto_opt,
     _option_count: c_int,
 ) -> c_int {
-    let _ = mosquitto_callback_unregister(
-        identifier as *mut mosquitto_plugin_id_t,
-        MOSQ_EVT_MESSAGE,
-        Some(on_message),
-        std::ptr::null(),
-    );
     if !userdata.is_null() {
-        drop(Box::from_raw(userdata as *mut PluginContext));
+        let ctx = Box::from_raw(userdata as *mut PluginContext);
+        let _ = mosquitto_callback_unregister(
+            ctx.identifier,
+            MOSQ_EVT_MESSAGE,
+            Some(on_message),
+            std::ptr::null(),
+        );
     }
     MOSQ_ERR_SUCCESS
 }
@@ -265,6 +276,7 @@ mod tests {
             future2: [std::ptr::null_mut(); 4],
         };
         let mut ctx = PluginContext {
+            identifier: std::ptr::null_mut(),
             matchers: Vec::new(),
         };
 
@@ -301,7 +313,7 @@ mod tests {
             assert!(!userdata.is_null());
             let registered = REGISTERED;
             assert!(registered.is_some());
-            mosquitto_plugin_cleanup(std::ptr::null_mut(), userdata, std::ptr::null_mut(), 0);
+            mosquitto_plugin_cleanup(userdata, std::ptr::null_mut(), 0);
 
             assert_eq!(
                 mosquitto_plugin_init(std::ptr::null_mut(), &mut userdata, std::ptr::null_mut(), 1),
@@ -391,7 +403,7 @@ mod tests {
             msg.topic = topic2.as_ptr() as *mut c_char;
             assert_eq!(
                 cb(MOSQ_EVT_MESSAGE, &mut msg as *mut _ as *mut c_void, ctx),
-                MOSQ_ERR_PLUGIN_DEFER
+                MOSQ_ERR_ACL_DENIED
             );
 
             let topic3 = CString::new("foo/baz").unwrap();
@@ -404,7 +416,7 @@ mod tests {
                 MOSQ_ERR_SUCCESS
             );
 
-            mosquitto_plugin_cleanup(std::ptr::null_mut(), userdata, std::ptr::null_mut(), 0);
+            mosquitto_plugin_cleanup(userdata, std::ptr::null_mut(), 0);
             let registered = REGISTERED;
             assert!(registered.is_none());
         }
