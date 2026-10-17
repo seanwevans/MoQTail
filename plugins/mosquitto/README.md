@@ -41,6 +41,25 @@ plugin_opt_selector //sensor/#
 
 Each `plugin_opt_selector` entry is compiled using `moqtail-core`. Messages that do not match any selector are denied (`MOSQ_ERR_ACL_DENIED`): Mosquitto drops them without disconnecting the publisher, and MQTT 5 publishers see reason code 0x87 (Not authorized) on QoS 1/2. The filter runs once per incoming PUBLISH, so it applies broker-wide, not per subscriber.
 
-Selectors that fail to compile are reported on stderr and skipped; the plugin
-still loads with whatever selectors did compile. A message whose payload is not
-valid JSON is matched on its topic and headers alone.
+The selectors are an allowlist, so the plugin refuses to load (and Mosquitto
+refuses to start) if any selector fails to compile or none is configured; the
+reason is printed on stderr. Loading anyway would silently drop the traffic the
+broken selector was meant to admit.
+
+## What selectors can see
+
+| Field | Source |
+| --- | --- |
+| Topic | The PUBLISH topic. |
+| `qos`, `retained` | The PUBLISH header. |
+| `json$…` | The payload, decoded as JSON, or as CBOR when it is not JSON. |
+
+The payload is only decoded when some selector has a `json$` predicate, and the
+headers are only collected when some selector reads one, so topic-only
+selectors cost nothing beyond the topic match. A payload that is neither JSON
+nor CBOR simply fails any `json$` predicate; the first such payload is reported
+on stderr, later ones are not.
+
+`dup` and MQTT 5 user properties (`prop.<name>`) are not available here:
+Mosquitto 2.0 does not pass the DUP flag to plugins and does not export the
+functions for reading message properties.

@@ -35,6 +35,15 @@ pub struct Matcher {
     linear: bool,
 }
 
+/// How `json$` predicates are evaluated.
+#[derive(Clone, Copy)]
+enum Payload {
+    /// Against `Message::payload`.
+    Given,
+    /// As satisfied, without looking at the payload; see [`Matcher::may_match`].
+    AssumeMatch,
+}
+
 #[derive(Clone, Copy)]
 enum PredicateState {
     Unknown,
@@ -111,15 +120,40 @@ impl Matcher {
     }
 
     pub fn matches(&self, msg: &Message) -> bool {
+        self.evaluate(msg, Payload::Given)
+    }
+
+    /// Whether `msg` could match once its payload is known, judging only by
+    /// its topic and headers: every `json$` predicate is taken as satisfied
+    /// and `msg.payload` is ignored.
+    ///
+    /// Selectors have no negation, so a payload can only make predicates true.
+    /// When this returns `false` no payload can make the message match, and a
+    /// caller can skip decoding it.
+    ///
+    /// ```
+    /// use moqtail_core::{compile, Matcher, Message};
+    /// use std::collections::HashMap;
+    ///
+    /// let m = Matcher::new(compile("//engine/+[json$.egt>520]").unwrap());
+    /// let msg = |topic| Message { topic, headers: HashMap::new(), payload: None };
+    /// assert!(m.may_match(&msg("ship/engine/port")));
+    /// assert!(!m.may_match(&msg("ship/nav/gps")));
+    /// ```
+    pub fn may_match(&self, msg: &Message) -> bool {
+        self.evaluate(msg, Payload::AssumeMatch)
+    }
+
+    fn evaluate(&self, msg: &Message, payload: Payload) -> bool {
         let steps = &self.selector.steps;
         if self.linear {
-            return Self::match_linear(steps, msg);
+            return Self::match_linear(steps, msg, payload);
         }
         SCRATCH.with(|cell| match cell.try_borrow_mut() {
-            Ok(mut scratch) => Self::match_steps(steps, msg, &mut scratch),
+            Ok(mut scratch) => Self::match_steps(steps, msg, payload, &mut scratch),
             // Only reachable if matching re-enters itself on this thread; fall
             // back to a fresh buffer rather than panicking.
-            Err(_) => Self::match_steps(steps, msg, &mut Scratch::default()),
+            Err(_) => Self::match_steps(steps, msg, payload, &mut Scratch::default()),
         })
     }
 
@@ -267,10 +301,10 @@ impl Matcher {
     ///
     /// Such a selector has exactly one way to align with a topic, so the topic
     /// is walked once, segment by segment, with no allocation.
-    fn match_linear(steps: &[Step], msg: &Message) -> bool {
+    fn match_linear(steps: &[Step], msg: &Message, payload: Payload) -> bool {
         let mut segments = topic_segments(msg.topic);
         for step in steps {
-            if !Self::predicates_match(&step.predicates, msg) {
+            if !Self::predicates_match(&step.predicates, msg, payload) {
                 return false;
             }
             match step.segment {
@@ -300,7 +334,7 @@ impl Matcher {
     /// `(steps + 1) * (segments + 1)` states is expanded at most once. Step
     /// predicates do not depend on the topic position, so each step's
     /// predicates are evaluated at most once per message.
-    fn match_steps(steps: &[Step], msg: &Message, scratch: &mut Scratch) -> bool {
+    fn match_steps(steps: &[Step], msg: &Message, payload: Payload, scratch: &mut Scratch) -> bool {
         let topic = msg.topic;
         scratch.segments.clear();
         let mut offset = 0;
@@ -348,7 +382,7 @@ impl Matcher {
                 PredicateState::Pass => true,
                 PredicateState::Fail => false,
                 PredicateState::Unknown => {
-                    let ok = Self::predicates_match(&step.predicates, msg);
+                    let ok = Self::predicates_match(&step.predicates, msg, payload);
                     predicates[step_idx] = if ok {
                         PredicateState::Pass
                     } else {
@@ -389,15 +423,15 @@ impl Matcher {
         false
     }
 
-    fn predicates_match(preds: &[Predicate], msg: &Message) -> bool {
-        preds.iter().all(|p| Self::predicate_match(p, msg))
+    fn predicates_match(preds: &[Predicate], msg: &Message, payload: Payload) -> bool {
+        preds.iter().all(|p| Self::predicate_match(p, msg, payload))
     }
 
     /// Compares one field of the message against a predicate's literal.
     ///
     /// A field that is missing, or whose type differs from the literal's, does
     /// not match. Strings and booleans only support `=`.
-    fn predicate_match(pred: &Predicate, msg: &Message) -> bool {
+    fn predicate_match(pred: &Predicate, msg: &Message, payload: Payload) -> bool {
         match pred.field {
             Field::Header(ref name) => {
                 let Some(hv) = msg.headers.get(name.as_str()) else {
@@ -417,6 +451,9 @@ impl Matcher {
                 }
             }
             Field::Json(ref path) => {
+                if let Payload::AssumeMatch = payload {
+                    return true;
+                }
                 let Some(v) = msg.payload.as_ref().and_then(|j| json_path(j, path)) else {
                     return false;
                 };
@@ -929,16 +966,84 @@ mod tests {
                 headers: headers.clone(),
                 payload: None,
             };
+            let steps = &matcher.selector.steps;
             let general =
-                Matcher::match_steps(&matcher.selector.steps, &msg, &mut Scratch::default());
+                Matcher::match_steps(steps, &msg, Payload::Given, &mut Scratch::default());
             assert_eq!(
-                Matcher::match_linear(&matcher.selector.steps, &msg),
+                Matcher::match_linear(steps, &msg, Payload::Given),
                 general,
                 "selector {sel:?} against topic {topic:?}"
             );
             checked += 1;
         }
         assert_eq!(checked, 20_000);
+    }
+
+    #[test]
+    fn may_match_ignores_payload_but_not_topic_or_headers() {
+        let headers = HashMap::from([(Cow::Borrowed("qos"), Cow::Borrowed("1"))]);
+        // The property callers rely on: a message that matches was never
+        // ruled out by `may_match`.
+        let mut state = 0x2545_F491_4F6C_DD1D_u64;
+        let mut next = move |n: u64| {
+            state ^= state << 13;
+            state ^= state >> 7;
+            state ^= state << 17;
+            state % n
+        };
+        let segs = ["a", "b", "+", "#", "msg"];
+        let preds = [
+            "",
+            "",
+            "[qos=1]",
+            "[json$.v>1]",
+            "[json$.v<=1]",
+            "[json$.s=\"x\"]",
+        ];
+        for _ in 0..20_000 {
+            let mut sel = String::new();
+            for _ in 0..1 + next(4) {
+                sel.push_str(if next(3) == 0 { "//" } else { "/" });
+                sel.push_str(segs[next(5) as usize]);
+                sel.push_str(preds[next(6) as usize]);
+            }
+            let m = Matcher::new(compile(&sel).unwrap());
+            let levels: Vec<&str> = (0..next(5)).map(|_| ["a", "b"][next(2) as usize]).collect();
+            let topic = levels.join("/");
+            let payload = [json!({"v": 2, "s": "x"}), json!({"v": 0}), json!(null)];
+            let msg = Message {
+                topic: &topic,
+                headers: headers.clone(),
+                payload: Some(payload[next(3) as usize].clone()),
+            };
+            assert!(!m.matches(&msg) || m.may_match(&msg), "{sel} on {topic}");
+        }
+
+        // (selector, [a/b, a/c, x/a/b]) -> whether the topic could match.
+        for (sel, expected) in [
+            ("/msg[qos=1]/a/+[json$.v>1]", [true, true, false]),
+            ("//b[json$.v>1][json$.s=\"x\"]", [true, false, true]),
+            ("/#/b[json$.v>1]", [true, false, true]),
+        ] {
+            let m = Matcher::new(compile(sel).unwrap());
+            for (topic, possible) in ["a/b", "a/c", "x/a/b"].into_iter().zip(expected) {
+                let msg = Message {
+                    topic,
+                    headers: headers.clone(),
+                    payload: Some(json!({"v": 0})),
+                };
+                assert_eq!(m.may_match(&msg), possible, "{sel} on {topic}");
+                // The payload above fails every json$ predicate.
+                assert!(!m.matches(&msg), "{sel} on {topic}");
+            }
+        }
+        let m = Matcher::new(compile("/msg[qos=2]/a/b[json$.v>1]").unwrap());
+        let msg = Message {
+            topic: "a/b",
+            headers,
+            payload: None,
+        };
+        assert!(!m.may_match(&msg), "headers are still checked");
     }
 
     #[test]
