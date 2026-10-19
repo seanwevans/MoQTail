@@ -714,8 +714,8 @@ name = "moqtail-mosquitto"
 version = "0.0.0"
 dependencies = [
  "cc",
+ "ciborium",
  "moqtail-core",
- "serde_json",
 ]
 
 [[package]]

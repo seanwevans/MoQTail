@@ -78,10 +78,39 @@ fn bench_window_avg(c: &mut Criterion) {
     });
 }
 
+/// Selectors shaped like broker-side filtering: a short topic, one or two
+/// predicates, evaluated once per incoming message.
+fn bench_typical_filters(c: &mut Criterion) {
+    let payload = serde_json::json!({"type": "temp", "value": 31.5, "status": "online"});
+    let mut headers = HashMap::new();
+    headers.insert(Cow::Borrowed("qos"), Cow::Borrowed("1"));
+    headers.insert(Cow::Borrowed("retained"), Cow::Borrowed("false"));
+    let msg = Message {
+        topic: "building/e/floor4/sensor",
+        headers,
+        payload: Some(payload),
+    };
+
+    for (name, sel) in [
+        ("plus_literal_hit", "/building/+/+/sensor"),
+        ("plus_literal_miss", "/building/+/+/actuator"),
+        ("descendant_json_pred", "//sensor[json$.value>30]"),
+        ("descendant_json_str", "//sensor[json$.status=\"online\"]"),
+        (
+            "header_pred_hash",
+            "/msg[qos<=1][retained=false]/building/#",
+        ),
+    ] {
+        let matcher = Matcher::new(compile(sel).unwrap());
+        c.bench_function(name, |b| b.iter(|| matcher.matches(black_box(&msg))));
+    }
+}
+
 criterion_group!(
     benches,
     bench_descendant_long_topic,
     bench_window_sum,
-    bench_window_avg
+    bench_window_avg,
+    bench_typical_filters
 );
 criterion_main!(benches);
